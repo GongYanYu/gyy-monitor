@@ -170,8 +170,7 @@ class App:
 
     def _on_quit(self):
         """托盘：退出应用。"""
-        self._running = False
-        self.window.destroy()
+        self.stop()
         self.tray.stop()
         os._exit(0)
 

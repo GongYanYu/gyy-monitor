@@ -32,6 +32,7 @@ def build():
         "--add-data", f"config.json{os.pathsep}.",
         "--hidden-import", "pystray._win32",
         "--hidden-import", "PIL._tkinter_finder",
+        "--hidden-import", "pynvml",
         "--noconfirm",
         str(project_root / "main.py"),
     ]
