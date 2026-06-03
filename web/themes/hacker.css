@@ -1,0 +1,24 @@
+/* 终端黑客风 — 纯黑背景 + 等宽字体 + 霓虹绿 */
+.monitor-container {
+  background: rgba(10, 10, 14, 0.92);
+  border: 1px solid rgba(0, 255, 100, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(0, 255, 100, 0.05);
+  font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+}
+
+.metric-label {
+  color: #0a0;
+  font-family: inherit;
+}
+
+.metric-value {
+  color: #0f0;
+  font-family: inherit;
+  text-shadow: 0 0 6px rgba(0, 255, 0, 0.3);
+}
+
+.metric-unit {
+  color: #0a0;
+  font-family: inherit;
+}
