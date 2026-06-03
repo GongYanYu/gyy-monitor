@@ -56,8 +56,10 @@ const app = createApp({
     // === 方法 ===
     function formatValue(value, metricDef) {
       if (value === null || value === undefined) return '--';
+      const num = Number(value);
+      if (isNaN(num)) return '--';
       const decimals = metricDef.decimals ?? 0;
-      return Number(value).toFixed(decimals);
+      return num.toFixed(decimals);
     }
 
     function styleLabel(s) {
