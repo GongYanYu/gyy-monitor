@@ -1,0 +1,38 @@
+{
+  "window": {
+    "width": 400,
+    "height": 60,
+    "x": null,
+    "y": null,
+    "always_on_top": true,
+    "click_through": false,
+    "draggable": true,
+    "opacity": 1.0,
+    "frameless": true
+  },
+  "display": {
+    "style": "minimal",
+    "layout": "horizontal",
+    "custom_css": null,
+    "font_size": 14,
+    "gap": 18,
+    "padding": 8
+  },
+  "metrics": [
+    {"id": "cpu_usage",   "enabled": true,  "label": "CPU",  "unit": "%",   "color": "#4fc3f7", "decimals": 0},
+    {"id": "cpu_temp",    "enabled": true,  "label": "CPUT", "unit": "°C",  "color": "#4fc3f7", "decimals": 0},
+    {"id": "cpu_power",   "enabled": false, "label": "CPUP", "unit": "W",   "color": "#4fc3f7", "decimals": 1},
+    {"id": "cpu_fan",     "enabled": false, "label": "CPUF", "unit": "RPM", "color": "#4fc3f7", "decimals": 0},
+    {"id": "gpu_usage",   "enabled": true,  "label": "GPU",  "unit": "%",   "color": "#81c784", "decimals": 0},
+    {"id": "gpu_temp",    "enabled": true,  "label": "GPUT", "unit": "°C",  "color": "#81c784", "decimals": 0},
+    {"id": "gpu_power",   "enabled": false, "label": "GPUP", "unit": "W",   "color": "#81c784", "decimals": 1},
+    {"id": "gpu_vram",    "enabled": false, "label": "VRAM", "unit": "%",   "color": "#81c784", "decimals": 0},
+    {"id": "gpu_fan",     "enabled": false, "label": "GPUF", "unit": "RPM", "color": "#81c784", "decimals": 0},
+    {"id": "ram_usage",   "enabled": true,  "label": "RAM",  "unit": "%",   "color": "#ffb74d", "decimals": 0},
+    {"id": "ram_used",    "enabled": false, "label": "RAMU", "unit": "GB",  "color": "#ffb74d", "decimals": 1},
+    {"id": "fps",         "enabled": false, "label": "FPS",  "unit": "",    "color": "#ce93d8", "decimals": 0},
+    {"id": "fps_1pct_low","enabled": false, "label": "1%L",  "unit": "",    "color": "#ce93d8", "decimals": 0}
+  ],
+  "update_interval_ms": 1000,
+  "autostart": false
+}
