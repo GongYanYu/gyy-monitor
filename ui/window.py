@@ -45,7 +45,7 @@ class MonitorWindow:
 
         # 应用点击穿透设置
         if win_cfg.get("click_through", False):
-            self._bridge._set_click_through(True)
+            self._bridge.toggle_click_through(True)
 
     def push_metrics(self, data: dict):
         """推送指标数据到前端。
