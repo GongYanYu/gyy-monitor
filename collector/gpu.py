@@ -88,3 +88,5 @@ class GpuCollector(BaseCollector):
                 pynvml.nvmlShutdown()
             except Exception:
                 pass
+            finally:
+                self._nvml_available = False
