@@ -1,0 +1,115 @@
+/* === 重置与基础 === */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* === 布局容器 === */
+.monitor-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+}
+
+.layout-horizontal {
+  flex-direction: row;
+  justify-content: center;
+}
+
+.layout-vertical {
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  align-content: center;
+}
+
+/* === 指标卡片 === */
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.metric-label {
+  font-size: 11px;
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.metric-unit {
+  font-size: 11px;
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+/* === 右键菜单 === */
+.context-menu {
+  position: fixed;
+  background: rgba(30, 30, 46, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 160px;
+  z-index: 9999;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.menu-item {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #cdd6f4;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.menu-item.active {
+  color: #89b4fa;
+}
+
+.menu-item.active::before {
+  content: '✓ ';
+}
+
+.menu-separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 4px 0;
+}
+
+.menu-label {
+  padding: 4px 12px;
+  font-size: 10px;
+  color: #6c7086;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
