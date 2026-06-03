@@ -7,6 +7,10 @@ from collector.base import BaseCollector
 class CpuCollector(BaseCollector):
     """采集 CPU 占用率、温度、功耗、风扇转速。"""
 
+    def __init__(self):
+        # 预调用一次以建立基线，后续 collect() 使用 interval=None 非阻塞获取差值
+        psutil.cpu_percent(interval=None)
+
     @property
     def available_metrics(self) -> list[str]:
         return ["cpu_usage", "cpu_temp", "cpu_power", "cpu_fan"]
@@ -14,9 +18,9 @@ class CpuCollector(BaseCollector):
     def collect(self) -> dict:
         result = {}
 
-        # CPU 占用率（非阻塞，取 0.5s 间隔）
+        # CPU 占用率（非阻塞，返回自上次调用以来的差值）
         try:
-            result["cpu_usage"] = round(psutil.cpu_percent(interval=0.5), 1)
+            result["cpu_usage"] = round(psutil.cpu_percent(interval=None), 1)
         except Exception:
             result["cpu_usage"] = None
 
@@ -68,7 +72,8 @@ class CpuCollector(BaseCollector):
             if not power:
                 return None
 
-            for label in ("coretemp", "cpu", "package"):
+            # RAPL 常见标签：package-0（Intel）、package、cpu
+            for label in ("package-0", "package", "cpu"):
                 if label in power:
                     entries = power[label]
                     if entries:
@@ -81,13 +86,23 @@ class CpuCollector(BaseCollector):
     def _get_cpu_fan(self) -> int | None:
         """获取 CPU 风扇转速（RPM）。
 
-        遍历 psutil.sensors_fans() 查找风扇数据。
+        优先查找 CPU 风扇标签，兜底取所有风扇中的最大值。
         """
         try:
             fans = psutil.sensors_fans()
             if not fans:
                 return None
 
+            # 优先查找 CPU 风扇
+            for label in ("cpu_fan", "cpufan", "cpu"):
+                if label in fans:
+                    entries = fans[label]
+                    if entries:
+                        speeds = [e.current for e in entries if e.current]
+                        if speeds:
+                            return max(speeds)
+
+            # 兜底：取所有风扇中的最大值
             for label in fans:
                 entries = fans[label]
                 if entries:
