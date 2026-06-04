@@ -1,16 +1,19 @@
-/* 极简数字风 — 暗色背景 + 彩色数字 */
+/* 极简数字风 — 透明背景 + 彩色数字 + 文字阴影确保可读 */
 .monitor-container {
   background: transparent;
 }
 
 .metric-label {
-  color: #a6adc8;
+  color: #e0e0e0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .metric-value {
   font-family: 'Consolas', 'Cascadia Code', 'Courier New', monospace;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 
 .metric-unit {
-  color: #a6adc8;
+  color: #b0b0b0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
