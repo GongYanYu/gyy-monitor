@@ -9,6 +9,13 @@ import sys
 import winreg
 from pathlib import Path
 
+def log_debug(msg):
+    try:
+        with open(r"d:\MyProjects\gyy-monitor\debug.log", "a", encoding="utf-8") as f:
+            f.write(msg + "\n")
+    except Exception:
+        pass
+
 # 针对 PyQt5 的全局线程安全辅助器类型（必须定义在模块级，不能定义在局部函数内）
 QtThreadHelper = None
 try:
@@ -51,14 +58,20 @@ class Bridge:
 
     def init_qt_helper(self):
         """在 Qt 主 GUI 线程中初始化线程辅助器。"""
+        log_debug(f"[Bridge] init_qt_helper 被调用, QtThreadHelper 存在={QtThreadHelper is not None}")
         if self._qt_helper:
+            log_debug("[Bridge] _qt_helper 已存在，跳过初始化")
             return
         if QtThreadHelper:
             try:
+                from PyQt5.QtWidgets import QApplication
                 self._qt_helper = QtThreadHelper()
-                print("[Bridge] PyQt5 线程辅助器已在主 GUI 线程中初始化")
+                # 强行将辅助对象移至 Qt 主 GUI 线程，确保信号连接被派遣到主线程执行
+                main_thread = QApplication.instance().thread()
+                self._qt_helper.moveToThread(main_thread)
+                log_debug("[Bridge] PyQt5 线程辅助器实例化成功，并已移至主 GUI 线程！")
             except Exception as e:
-                print(f"[Bridge] 初始化 Qt 线程辅助器失败: {e}")
+                log_debug(f"[Bridge] 初始化 Qt 线程辅助器失败: {e}")
 
     def set_on_config_changed(self, callback):
         """设置配置变更回调。"""
@@ -180,21 +193,26 @@ class Bridge:
 
     def show_context_menu(self):
         """显示原生右键菜单（通过主线程机制防止跨线程 GUI 调用导致 Python 崩溃）。"""
+        log_debug(f"[Bridge] show_context_menu 触发, _window 存在={self._window is not None}")
         if not self._window:
             return
 
         native = self._window.native
         if not native:
+            log_debug("[Bridge] native 窗口对象为 None，直接返回")
             return
 
         native_type = type(native).__name__
+        log_debug(f"[Bridge] native 窗口类型: {native_type}")
 
         # 1. PyQt5 / PySide2 QMainWindow (pywebview 类名为 BrowserView)
         if "BrowserView" in native_type or "QMainWindow" in native_type or hasattr(native, 'winId'):
+            log_debug(f"[Bridge] 匹配到 Qt 后端，_qt_helper 存在={self._qt_helper is not None}")
             if self._qt_helper:
-                # 通过信号发射，强行让菜单渲染运行在 Qt 的主 GUI 线程上，避免 C++ 线程冲突崩溃
+                log_debug("[Bridge] 发射信号给主线程执行 _show_qt_menu")
                 self._qt_helper.trigger.emit(self._show_qt_menu)
             else:
+                log_debug("[Bridge] _qt_helper 不存在，尝试在当前线程直接执行 _show_qt_menu (可能会崩溃)")
                 self._show_qt_menu()
 
         # 2. WinForms Form
@@ -213,11 +231,13 @@ class Bridge:
 
     def _show_qt_menu(self):
         """在 Qt 主 GUI 线程渲染并弹出右键菜单。"""
+        log_debug("[Bridge] _show_qt_menu 开始在当前线程执行...")
         try:
             from PyQt5.QtWidgets import QMenu, QAction
             from PyQt5.QtGui import QCursor
 
             menu = QMenu()
+            log_debug("[Bridge] QMenu 实例化成功")
 
             # 点击穿透
             click_through = self._config["window"].get("click_through", False)
