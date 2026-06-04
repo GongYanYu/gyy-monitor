@@ -1,4 +1,4 @@
-"""GPU 硬件数据采集器（NVIDIA GPU，通过 pynvml）。"""
+"""GPU 硬件数据采集器（NVIDIA GPU，通过 nvidia-ml-py）。"""
 
 from collector.base import BaseCollector
 
