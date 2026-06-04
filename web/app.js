@@ -77,6 +77,14 @@ const app = createApp({
     }
 
     function showMenu(e) {
+      try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.show_context_menu) {
+          pywebview.api.show_context_menu();
+          return;
+        }
+      } catch (err) {
+        console.warn('调用原生右键菜单失败:', err);
+      }
       menuX.value = e.clientX;
       menuY.value = e.clientY;
       menuVisible.value = true;

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>gyy-monitor 设置</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* === 现代极简设计系统 === */
+    :root {
+      --bg-color: #0e0f14;
+      --card-bg: rgba(22, 24, 33, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-color: #4f46e5;
+      --accent-hover: #6366f1;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --success-color: #10b981;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Outfit', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      overflow-x: hidden;
+      padding: 20px;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-height: 610px; /* 控制高度贴合窗口 */
+    }
+
+    /* === 标题栏 === */
+    .header {
+      margin-bottom: 20px;
+      flex-shrink: 0;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #a5b4fc, #6366f1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* === 标签导航页 === */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      margin-bottom: 20px;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tab-btn.active {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    /* === 内容区域 === */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+      margin-bottom: 20px;
+    }
+
+    /* 自定义滚动条 */
+    .content-area::-webkit-scrollbar {
+      width: 6px;
+    }
+    .content-area::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .content-area::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    /* === 表单表项 === */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(12px);
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: #a5b4fc;
+    }
+
+    .form-group {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .form-label {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .form-label span {
+      display: block;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-weight: 400;
+    }
+
+    /* Input Controls */
+    select, input[type="number"], input[type="text"] {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 140px;
+      text-align: right;
+    }
+
+    select {
+      text-align-last: right;
+      padding-right: 20px;
+    }
+
+    select:focus, input[type="number"]:focus, input[type="text"]:focus {
+      border-color: var(--accent-hover);
+    }
+
+    /* Switch toggle */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.1);
+      transition: .2s;
+      border-radius: 24px;
+      border: 1px solid var(--border-color);
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--text-main);
+      transition: .2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent-color);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    /* === 指标项专属面板 === */
+    .metric-list-item {
+      display: grid;
+      grid-template-columns: 24px 34px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      transition: all 0.2s;
+    }
+
+    .metric-list-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .metric-drag-btn {
+      color: var(--text-muted);
+      cursor: grab;
+      font-size: 14px;
+    }
+
+    .metric-order-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .order-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 10px;
+      padding: 2px;
+      line-height: 1;
+    }
+
+    .order-btn:hover {
+      color: var(--text-main);
+    }
+
+    .metric-title {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .metric-title span {
+      display: block;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 400;
+      margin-top: 1px;
+    }
+
+    .metric-edit-fields {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .metric-edit-fields input[type="text"] {
+      width: 70px;
+      text-align: center;
+      padding: 4px;
+      font-size: 12px;
+    }
+
+    .metric-edit-fields input[type="number"] {
+      width: 46px;
+      text-align: center;
+      padding: 4px;
+      font-size: 12px;
+    }
+
+    .color-picker-wrapper {
+      position: relative;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+    }
+
+    .color-picker-wrapper input[type="color"] {
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      width: 32px;
+      height: 32px;
+      border: none;
+      cursor: pointer;
+      background: none;
+    }
+
+    /* === 底部保存栏 === */
+    .footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-color);
+      flex-shrink: 0;
+      background: var(--bg-color);
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-primary {
+      background: var(--accent-color);
+      border: none;
+      color: white;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    /* === 消息气泡 === */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(40px);
+      background: var(--success-color);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+      transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- 标题 -->
+    <div class="header">
+      <h1>gyy-monitor 设置</h1>
+      <p>自定义您的系统硬件监控悬浮窗</p>
+    </div>
+
+    <!-- 标签 -->
+    <div class="tabs">
+      <button class="tab-btn" :class="{ active: currentTab === 'display' }" @click="currentTab = 'display'">🎨 风格布局</button>
+      <button class="tab-btn" :class="{ active: currentTab === 'metrics' }" @click="currentTab = 'metrics'">📊 指标管理</button>
+      <button class="tab-btn" :class="{ active: currentTab === 'window' }" @click="currentTab = 'window'">🖥 窗口系统</button>
+    </div>
+
+    <!-- 内容 -->
+    <div class="content-area">
+      <!-- 风格与布局 -->
+      <div v-show="currentTab === 'display'">
+        <div class="card">
+          <div class="card-title">视觉风格</div>
+          <div class="form-group">
+            <div class="form-label">
+              主题样式
+              <span>切换悬浮窗的背景与边框效果</span>
+            </div>
+            <select v-model="config.display.style">
+              <option value="minimal">极简数字 (透明风格)</option>
+              <option value="glass">暗色玻璃 (Acrylic 磨砂)</option>
+              <option value="hacker">终端黑客 (Neon 绿黑)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <div class="form-label">
+              布局方向
+              <span>多指标的排列方向</span>
+            </div>
+            <select v-model="config.display.layout">
+              <option value="horizontal">横向排列 (Row)</option>
+              <option value="vertical">纵向排列 (Column)</option>
+              <option value="grid">网格排列 (Grid)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">排版细节</div>
+          <div class="form-group">
+            <div class="form-label">字体大小 (px)</div>
+            <input type="number" min="8" max="32" v-model.number="config.display.font_size">
+          </div>
+          <div class="form-group">
+            <div class="form-label">指标间距 (px)</div>
+            <input type="number" min="0" max="60" v-model.number="config.display.gap">
+          </div>
+          <div class="form-group">
+            <div class="form-label">内边距 (px)</div>
+            <input type="number" min="0" max="40" v-model.number="config.display.padding">
+          </div>
+        </div>
+      </div>
+
+      <!-- 指标管理 -->
+      <div v-show="currentTab === 'metrics'">
+        <div class="card">
+          <div class="card-title">指标管理与排序 (点击上下箭头进行排序)</div>
+          <div class="metric-list">
+            <div v-for="(item, index) in config.metrics" :key="item.id" class="metric-list-item">
+              <!-- 排序按钮 -->
+              <div class="metric-order-controls">
+                <button class="order-btn" @click="moveMetricUp(index)" :disabled="index === 0">▲</button>
+                <button class="order-btn" @click="moveMetricDown(index)" :disabled="index === config.metrics.length - 1">▼</button>
+              </div>
+
+              <!-- 开关 -->
+              <label class="switch">
+                <input type="checkbox" v-model="item.enabled">
+                <span class="slider"></span>
+              </label>
+
+              <!-- 名字信息 -->
+              <div class="metric-title">
+                {{ item.id }}
+                <span>单位: {{ item.unit || '无' }}</span>
+              </div>
+
+              <!-- 可编辑字段 -->
+              <div class="metric-edit-fields">
+                <input type="text" placeholder="标签" v-model="item.label" title="前端显示的标签">
+                <input type="number" min="0" max="3" v-model.number="item.decimals" placeholder="精度" title="保留小数位数">
+                <div class="color-picker-wrapper" :style="{ backgroundColor: item.color }">
+                  <input type="color" v-model="item.color" title="文本显示颜色">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 窗口与系统 -->
+      <div v-show="currentTab === 'window'">
+        <div class="card">
+          <div class="card-title">窗口属性</div>
+          <div class="form-group">
+            <div class="form-label">窗口尺寸</div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="number" min="100" max="1920" v-model.number="config.window.width" style="width: 70px; text-align: center;" placeholder="宽">
+              <span style="font-size: 12px; color: var(--text-muted);">×</span>
+              <input type="number" min="30" max="1080" v-model.number="config.window.height" style="width: 70px; text-align: center;" placeholder="高">
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="form-label">窗口置顶<span>将悬浮窗保持在所有窗口最上层</span></div>
+            <label class="switch">
+              <input type="checkbox" v-model="config.window.always_on_top">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-group">
+            <div class="form-label">鼠标点击穿透<span>允许穿透悬浮窗点击下方窗口</span></div>
+            <label class="switch">
+              <input type="checkbox" v-model="config.window.click_through">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-group">
+            <div class="form-label">允许鼠标拖拽<span>可以通过鼠标按住拖动窗口</span></div>
+            <label class="switch">
+              <input type="checkbox" v-model="config.window.draggable">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">系统选项</div>
+          <div class="form-group">
+            <div class="form-label">更新频率 (ms)<span>硬件数据刷新的间隔时间</span></div>
+            <input type="number" min="100" max="10000" step="100" v-model.number="config.update_interval_ms">
+          </div>
+          <div class="form-group">
+            <div class="form-label">开机自启<span>随 Windows 系统启动自动后台运行</span></div>
+            <label class="switch">
+              <input type="checkbox" v-model="config.autostart">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部按钮 -->
+    <div class="footer">
+      <button class="btn btn-secondary" @click="closeSettings">取消</button>
+      <button class="btn btn-primary" @click="saveSettings">保存并应用</button>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast" :class="{ show: toastVisible }">
+      🎉 配置已成功保存并应用！
+    </div>
+  </div>
+
+  <script src="vue.global.prod.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

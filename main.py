@@ -75,6 +75,7 @@ class App:
 
         # 初始化各模块
         self.bridge = Bridge(self.config_path, self.config)
+        self.bridge.set_on_quit(self._on_quit)
         self.window = MonitorWindow(self.config, self.bridge)
         self.tray = SystemTray(
             on_toggle=self._on_toggle,
@@ -99,6 +100,9 @@ class App:
     def start(self):
         """启动应用。"""
         self._running = True
+
+        # 同步开机自启项到注册表
+        self.bridge._update_autostart_registry(self.config.get("autostart", False))
 
         # 创建窗口
         self.window.create()
@@ -195,6 +199,20 @@ class App:
     def _on_config_reloaded(self, config: dict):
         """配置热加载回调。"""
         self.config = config
+
+        # 动态将新的窗口设置应用到原生窗口对象上
+        if self.window and self.window._window:
+            try:
+                win_cfg = config.get("window", {})
+                self.window._window.on_top = win_cfg.get("always_on_top", True)
+                self.window._window.resize(
+                    win_cfg.get("width", 400),
+                    win_cfg.get("height", 60)
+                )
+                self.bridge.toggle_click_through(win_cfg.get("click_through", False))
+            except Exception as e:
+                print(f"[Main] 动态更新窗口属性失败: {e}")
+
         self.window.push_config(config)
 
 
