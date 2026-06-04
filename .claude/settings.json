@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Read(//c/Users/GongYanYu/.claude/plugins/cache/claude-plugins-official/superpowers/5.1.0/skills/subagent-driven-development/**)",
+      "Bash(git -C /d/MyProjects/gyy-monitor log --oneline -5)",
+      "Bash(pip install *)",
+      "Bash(git -C /d/MyProjects/gyy-monitor add requirements.txt collector/__init__.py ui/__init__.py)",
+      "Bash(git -C /d/MyProjects/gyy-monitor commit -m \"chore: 初始化项目骨架和依赖\")"
     ]
   }
 }

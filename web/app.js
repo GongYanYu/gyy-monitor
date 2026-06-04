@@ -28,7 +28,13 @@ const app = createApp({
           style: 'minimal', layout: 'horizontal',
           custom_css: null, font_size: 14, gap: 18, padding: 8,
         },
-        metrics: [],
+        metrics: [
+          {"id": "cpu_usage", "enabled": true, "label": "CPU", "unit": "%", "color": "#4fc3f7", "decimals": 0},
+          {"id": "cpu_temp", "enabled": true, "label": "CPUT", "unit": "°C", "color": "#4fc3f7", "decimals": 0},
+          {"id": "gpu_usage", "enabled": true, "label": "GPU", "unit": "%", "color": "#81c784", "decimals": 0},
+          {"id": "gpu_temp", "enabled": true, "label": "GPUT", "unit": "°C", "color": "#81c784", "decimals": 0},
+          {"id": "ram_usage", "enabled": true, "label": "RAM", "unit": "%", "color": "#ffb74d", "decimals": 0},
+        ],
         update_interval_ms: 1000,
         autostart: false,
       };
