@@ -177,6 +177,11 @@
       padding-right: 20px;
     }
 
+    select option {
+      background-color: #161821;
+      color: var(--text-main);
+    }
+
     select:focus, input[type="number"]:focus, input[type="text"]:focus {
       border-color: var(--accent-hover);
     }
@@ -543,6 +548,13 @@
             <div class="form-label">开机自启<span>随 Windows 系统启动自动后台运行</span></div>
             <label class="switch">
               <input type="checkbox" v-model="config.autostart">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-group">
+            <div class="form-label">FPS 仅游戏时显示<span>非游戏状态下自动隐藏 FPS 与 1%L 指标</span></div>
+            <label class="switch">
+              <input type="checkbox" v-model="config.fps_only_in_game">
               <span class="slider"></span>
             </label>
           </div>

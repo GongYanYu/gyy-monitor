@@ -1,6 +1,6 @@
 /* gyy-monitor 设置页 — Vue 3 逻辑 */
 
-const { createApp, ref, onMounted } = Vue;
+const { createApp, ref, onMounted, watch } = Vue;
 
 const app = createApp({
   setup() {
@@ -20,6 +20,7 @@ const app = createApp({
       autostart: false,
     });
     const toastVisible = ref(false);
+    let isLoaded = false;
 
     // === 初始化：从 Python 获取当前配置 ===
     onMounted(async () => {
@@ -39,8 +40,21 @@ const app = createApp({
         }
       } catch (err) {
         console.warn('获取配置失败:', err);
+      } finally {
+        isLoaded = true;
       }
     });
+
+    // 深度监听配置变化并实时临时应用预览，但不写入磁盘
+    watch(config, (newVal) => {
+      if (!isLoaded) return;
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.apply_config_temp) {
+        const rawConfig = JSON.parse(JSON.stringify(newVal));
+        pywebview.api.apply_config_temp(rawConfig).catch(err => {
+          console.warn('实时预览配置失败:', err);
+        });
+      }
+    }, { deep: true });
 
     // === 指标排序：向上移动 ===
     function moveMetricUp(index) {

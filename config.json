@@ -7,7 +7,7 @@
     "always_on_top": true,
     "click_through": false,
     "draggable": true,
-    "opacity": 1.0,
+    "opacity": 1,
     "frameless": true
   },
   "display": {
@@ -15,7 +15,7 @@
     "layout": "horizontal",
     "custom_css": null,
     "font_size": 14,
-    "gap": 18,
+    "gap": 1,
     "padding": 8
   },
   "metrics": [
@@ -28,16 +28,8 @@
       "decimals": 0
     },
     {
-      "id": "cpu_temp",
-      "enabled": true,
-      "label": "CPUT",
-      "unit": "°C",
-      "color": "#4fc3f7",
-      "decimals": 0
-    },
-    {
       "id": "cpu_power",
-      "enabled": false,
+      "enabled": true,
       "label": "CPUP",
       "unit": "W",
       "color": "#4fc3f7",
@@ -45,9 +37,17 @@
     },
     {
       "id": "cpu_fan",
-      "enabled": false,
+      "enabled": true,
       "label": "CPUF",
       "unit": "RPM",
+      "color": "#4fc3f7",
+      "decimals": 0
+    },
+    {
+      "id": "cpu_temp",
+      "enabled": true,
+      "label": "CPUT",
+      "unit": "°C",
       "color": "#4fc3f7",
       "decimals": 0
     },
@@ -69,7 +69,7 @@
     },
     {
       "id": "gpu_power",
-      "enabled": false,
+      "enabled": true,
       "label": "GPUP",
       "unit": "W",
       "color": "#81c784",
@@ -77,7 +77,7 @@
     },
     {
       "id": "gpu_vram",
-      "enabled": false,
+      "enabled": true,
       "label": "VRAM",
       "unit": "%",
       "color": "#81c784",
@@ -85,7 +85,7 @@
     },
     {
       "id": "gpu_fan",
-      "enabled": false,
+      "enabled": true,
       "label": "GPUF",
       "unit": "RPM",
       "color": "#81c784",
@@ -101,7 +101,7 @@
     },
     {
       "id": "ram_used",
-      "enabled": false,
+      "enabled": true,
       "label": "RAMU",
       "unit": "GB",
       "color": "#ffb74d",
@@ -109,7 +109,7 @@
     },
     {
       "id": "fps",
-      "enabled": false,
+      "enabled": true,
       "label": "FPS",
       "unit": "",
       "color": "#ce93d8",
@@ -117,7 +117,7 @@
     },
     {
       "id": "fps_1pct_low",
-      "enabled": false,
+      "enabled": true,
       "label": "1%L",
       "unit": "",
       "color": "#ce93d8",
@@ -125,5 +125,6 @@
     }
   ],
   "update_interval_ms": 1000,
+  "fps_only_in_game": true,
   "autostart": false
 }

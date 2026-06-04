@@ -23,10 +23,7 @@
         :style="cardStyle"
       >
         <span class="metric-label">{{ item.label }}</span>
-        <span class="metric-value" :style="{ color: item.color }">
-          {{ formatValue(metrics[item.id], item) }}
-          <span class="metric-unit" v-if="item.unit">{{ item.unit }}</span>
-        </span>
+        <span class="metric-value" :style="{ color: item.color }">{{ formatValue(metrics[item.id], item) }}<span class="metric-unit" v-if="item.unit">{{ item.unit }}</span></span>
       </div>
     </div>
 

@@ -128,7 +128,7 @@ class App:
         webview.start(gui=gui_backend, debug=False)
 
         # 清理
-        self._running = False
+        self.stop()
         self.tray.stop()
 
     def stop(self):
@@ -218,6 +218,34 @@ class App:
 
 def main():
     """程序入口。"""
+    import ctypes
+    import sys
+
+    # 检查并自动请求管理员权限 (UAC 提权)
+    try:
+        is_admin = ctypes.windll.shell32.IsUserAnAdmin()
+    except Exception:
+        is_admin = False
+
+    if not is_admin:
+        try:
+            if getattr(sys, 'frozen', False):
+                # 打包后的 EXE 运行方式
+                ctypes.windll.shell32.ShellExecuteW(
+                    None, "runas", sys.executable, " ".join(sys.argv[1:]), None, 1
+                )
+            else:
+                # Python 脚本开发运行方式
+                script_path = sys.argv[0]
+                args = " ".join(f'"{arg}"' for arg in sys.argv[1:])
+                params = f'"{script_path}" {args}'
+                ctypes.windll.shell32.ShellExecuteW(
+                    None, "runas", sys.executable, params, None, 1
+                )
+            sys.exit(0)
+        except Exception as e:
+            print(f"[Main] 请求管理员提权失败: {e}，将尝试以普通权限继续运行。")
+
     app = App()
     try:
         app.start()

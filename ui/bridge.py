@@ -148,6 +148,46 @@ class Bridge:
             print(f"[Bridge] set_config_bulk 失败: {e}")
             return False
 
+    def apply_config_temp(self, patch: dict) -> bool:
+        """临时应用配置（合并内存中，不保存到文件），供设置界面实时预览。"""
+        try:
+            for k, v in patch.items():
+                if k in self._config and isinstance(self._config[k], dict) and isinstance(v, dict):
+                    self._config[k].update(v)
+                else:
+                    self._config[k] = v
+
+            if self._on_config_changed:
+                self._on_config_changed(self._config)
+            return True
+        except Exception as e:
+            print(f"[Bridge] apply_config_temp 失败: {e}")
+            return False
+
+    def resize_window_to_fit(self, width: int, height: int, allow_shrink: bool = True) -> bool:
+        """当配置尺寸过小时，由前端测量并自适应扩大窗口尺寸。"""
+        if not self._window:
+            return False
+        try:
+            win_cfg = self._config.get("window", {})
+            cfg_width = win_cfg.get("width", 400)
+            cfg_height = win_cfg.get("height", 60)
+
+            if allow_shrink:
+                target_width = max(cfg_width, width)
+                target_height = max(cfg_height, height)
+            else:
+                target_width = max(self._window.width, cfg_width, width)
+                target_height = max(self._window.height, cfg_height, height)
+
+            # 仅在需要改变大小时触发 resize，防止频繁 resize 引起闪烁或死循环
+            if self._window.width != target_width or self._window.height != target_height:
+                self._window.resize(target_width, target_height)
+            return True
+        except Exception as e:
+            print(f"[Bridge] resize_window_to_fit 失败: {e}")
+            return False
+
     def toggle_click_through(self, enabled: bool) -> bool:
         """切换点击穿透模式。"""
         try:
@@ -409,6 +449,17 @@ class Bridge:
 
     def _on_settings_closed(self):
         self._settings_window = None
+        # 当设置窗口关闭时，重新从文件加载配置以回滚未保存的临时预览修改
+        try:
+            if os.path.exists(self._config_path):
+                with open(self._config_path, "r", encoding="utf-8") as f:
+                    saved_config = json.load(f)
+                self._config.clear()
+                self._config.update(saved_config)
+                if self._on_config_changed:
+                    self._on_config_changed(self._config)
+        except Exception as e:
+            print(f"[Bridge] 回退配置失败: {e}")
 
     def quit_app(self):
         """安全退出应用。"""

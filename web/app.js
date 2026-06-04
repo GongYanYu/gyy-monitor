@@ -37,12 +37,22 @@ const app = createApp({
         ],
         update_interval_ms: 1000,
         autostart: false,
+        fps_only_in_game: true,
       };
     }
 
     // === 计算属性 ===
     const enabledMetrics = computed(() => {
-      return (config.value.metrics || []).filter(m => m.enabled);
+      const fpsIds = ['fps', 'fps_1pct_low'];
+      return (config.value.metrics || []).filter(m => {
+        if (!m.enabled) return false;
+        // 当 fps_only_in_game 开启时，如果 FPS/1%L 值为 0 或无数据，则隐藏该指标
+        if (config.value.fps_only_in_game && fpsIds.includes(m.id)) {
+          const val = metrics.value[m.id];
+          if (val === null || val === undefined || val === 0 || val === 0.0) return false;
+        }
+        return true;
+      });
     });
 
     const containerStyle = computed(() => {
@@ -155,6 +165,69 @@ const app = createApp({
       dragging = false;
     }
 
+    // === 自动调整窗口大小以完全显示所有指标数据 ===
+    async function adjustWindowSize(allowShrink = true) {
+      await Vue.nextTick();
+      const container = document.querySelector('.monitor-container');
+      if (!container) return;
+
+      const cards = container.querySelectorAll('.metric-card');
+      if (cards.length === 0) return;
+
+      const layout = config.value.display.layout;
+      const padding = config.value.display.padding || 8;
+      const gap = config.value.display.gap || 18;
+
+      let reqWidth = 0;
+      let reqHeight = 0;
+
+      if (layout === 'horizontal') {
+        let totalCardsWidth = 0;
+        let maxCardHeight = 0;
+        cards.forEach(card => {
+          const rect = card.getBoundingClientRect();
+          totalCardsWidth += rect.width;
+          if (rect.height > maxCardHeight) maxCardHeight = rect.height;
+        });
+        reqWidth = totalCardsWidth + (cards.length - 1) * gap + 2 * padding;
+        reqHeight = maxCardHeight + 2 * padding;
+      } else if (layout === 'vertical') {
+        let totalCardsHeight = 0;
+        let maxCardWidth = 0;
+        cards.forEach(card => {
+          const rect = card.getBoundingClientRect();
+          totalCardsHeight += rect.height;
+          if (rect.width > maxCardWidth) maxCardWidth = rect.width;
+        });
+        reqWidth = maxCardWidth + 2 * padding;
+        reqHeight = totalCardsHeight + (cards.length - 1) * gap + 2 * padding;
+      } else if (layout === 'grid') {
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        cards.forEach(card => {
+          const rect = card.getBoundingClientRect();
+          if (rect.left < minX) minX = rect.left;
+          if (rect.right > maxX) maxX = rect.right;
+          if (rect.top < minY) minY = rect.top;
+          if (rect.bottom > maxY) maxY = rect.bottom;
+        });
+        reqWidth = (maxX - minX) + 2 * padding;
+        reqHeight = (maxY - minY) + 2 * padding;
+      }
+
+      // 加上 8px 缓冲以应对四舍五入或可能出现的边框/滚动条导致被裁剪
+      const finalWidth = Math.ceil(reqWidth) + 8;
+      const finalHeight = Math.ceil(reqHeight) + 8;
+
+      try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.resize_window_to_fit) {
+          await pywebview.api.resize_window_to_fit(finalWidth, finalHeight, allowShrink);
+        }
+      } catch (e) {
+        console.warn('调整窗口自适应尺寸失败:', e);
+      }
+    }
+
     // === 主题加载 ===
     function loadThemeStyle(style) {
       const link = document.getElementById('theme-style');
@@ -163,6 +236,14 @@ const app = createApp({
 
     // === 初始化 ===
     onMounted(async () => {
+      // 循环等待 pywebview.api 初始化完毕，以确保能正确读取到后端保存的配置
+      let retries = 0;
+      while (!window.pywebview || !window.pywebview.api) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        retries++;
+        if (retries > 60) break; // 最多等3秒
+      }
+
       // 加载配置
       try {
         const cfg = await pywebview.api.get_config();
@@ -179,15 +260,20 @@ const app = createApp({
       document.addEventListener('mouseup', onMouseUp);
 
       // 暴露 updateMetrics 供 Python 调用
-      window.updateMetrics = (data) => {
+      window.updateMetrics = async (data) => {
         metrics.value = { ...metrics.value, ...data };
+        await adjustWindowSize(false); // 指标数据更新不缩小窗口，防止数据波动频繁抖动
       };
 
       // 暴露 updateConfig 供 Python 热加载调用
-      window.updateConfig = (newConfig) => {
+      window.updateConfig = async (newConfig) => {
         config.value = { ...config.value, ...newConfig };
         loadThemeStyle(config.value.display.style);
+        await adjustWindowSize(true); // 配置发生变更时允许根据新配置收缩或扩大
       };
+
+      // 初始化时执行自适应调整
+      await adjustWindowSize(true);
     });
 
     onUnmounted(() => {
