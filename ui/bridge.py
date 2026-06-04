@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import winreg
+import threading
 from pathlib import Path
 
 def log_debug(msg):
@@ -252,51 +253,68 @@ class Bridge:
 
             # 点击穿透
             click_through = self._config["window"].get("click_through", False)
+            log_debug(f"[Bridge] 获取 click_through: {click_through}")
             txt_through = "🔲 关闭穿透" if click_through else "🔳 开启穿透"
             act_through = QAction(txt_through, menu)
-            act_through.triggered.connect(lambda: self.toggle_click_through(not click_through))
+            log_debug("[Bridge] 穿透 QAction 创建成功")
+            act_through.triggered.connect(lambda: threading.Thread(target=self.toggle_click_through, args=(not click_through,), daemon=True).start())
             menu.addAction(act_through)
+            log_debug("[Bridge] 穿透 action 添加成功")
 
             menu.addSeparator()
 
             # 风格子菜单
             style_menu = menu.addMenu("🎨 风格")
+            log_debug("[Bridge] 风格子菜单创建成功")
             curr_style = self._config["display"].get("style", "minimal")
             for s, label in [("minimal", "极简数字"), ("glass", "暗色玻璃"), ("hacker", "终端黑客")]:
                 act = QAction(label, style_menu, checkable=True, checked=(s == curr_style))
-                act.triggered.connect(lambda checked, val=s: self.set_config("display.style", val))
+                act.triggered.connect(lambda checked, val=s: threading.Thread(target=self.set_config, args=("display.style", val), daemon=True).start())
                 style_menu.addAction(act)
+            log_debug("[Bridge] 风格子菜单项添加成功")
 
             # 布局子菜单
             layout_menu = menu.addMenu("📐 布局")
+            log_debug("[Bridge] 布局子菜单创建成功")
             curr_layout = self._config["display"].get("layout", "horizontal")
             for l, label in [("horizontal", "水平"), ("vertical", "垂直"), ("grid", "网格")]:
                 act = QAction(label, layout_menu, checkable=True, checked=(l == curr_layout))
-                act.triggered.connect(lambda checked, val=l: self.set_config("display.layout", val))
+                act.triggered.connect(lambda checked, val=l: threading.Thread(target=self.set_config, args=("display.layout", val), daemon=True).start())
                 layout_menu.addAction(act)
+            log_debug("[Bridge] 布局子菜单项添加成功")
 
             menu.addSeparator()
 
             # 设置
             act_settings = QAction("⚙️ 设置...", menu)
-            act_settings.triggered.connect(self.open_settings_window)
+            act_settings.triggered.connect(lambda: threading.Thread(target=self.open_settings_window, daemon=True).start())
             menu.addAction(act_settings)
+            log_debug("[Bridge] 设置项添加成功")
 
             # 隐藏窗口
             act_hide = QAction("👁 隐藏窗口", menu)
-            act_hide.triggered.connect(self.toggle_visible)
+            act_hide.triggered.connect(lambda: threading.Thread(target=self.toggle_visible, daemon=True).start())
             menu.addAction(act_hide)
+            log_debug("[Bridge] 隐藏窗口项添加成功")
 
             menu.addSeparator()
 
             # 退出
             act_quit = QAction("❌ 退出", menu)
-            act_quit.triggered.connect(self.quit_app)
+            act_quit.triggered.connect(lambda: threading.Thread(target=self.quit_app, daemon=True).start())
             menu.addAction(act_quit)
+            log_debug("[Bridge] 退出项添加成功")
 
-            menu.exec_(QCursor.pos())
+            cursor_pos = QCursor.pos()
+            log_debug(f"[Bridge] 获取游标位置: {cursor_pos}")
+            
+            # 使用 winId() 窗口作为 parent 可以帮助 QMenu 正确渲染与销毁
+            # 我们将主窗口传递给 exec_ 帮助定位
+            log_debug("[Bridge] 准备执行 menu.exec_")
+            menu.exec_(cursor_pos)
+            log_debug("[Bridge] menu.exec_ 执行完毕")
         except Exception as e:
-            print(f"[Bridge] 弹出 PyQt5 右键菜单失败: {e}")
+            log_debug(f"[Bridge] 弹出 PyQt5 右键菜单失败异常: {e}")
 
     def _show_winforms_menu(self):
         """在 WinForms 主 GUI 线程渲染并弹出右键菜单。"""
@@ -311,7 +329,7 @@ class Bridge:
             click_through = self._config["window"].get("click_through", False)
             txt_through = "🔲 关闭穿透" if click_through else "🔳 开启穿透"
             item_through = menu.Items.Add(txt_through)
-            item_through.Click += lambda s, e: self.toggle_click_through(not click_through)
+            item_through.Click += lambda s, e: threading.Thread(target=self.toggle_click_through, args=(not click_through,), daemon=True).start()
 
             menu.Items.Add(WinForms.ToolStripSeparator())
 
@@ -321,7 +339,7 @@ class Bridge:
             for s, label in [("minimal", "极简数字"), ("glass", "暗色玻璃"), ("hacker", "终端黑客")]:
                 sub = WinForms.ToolStripMenuItem(label)
                 sub.Checked = (s == curr_style)
-                sub.Click += lambda s_sender, e_args, val=s: self.set_config("display.style", val)
+                sub.Click += lambda s_sender, e_args, val=s: threading.Thread(target=self.set_config, args=("display.style", val), daemon=True).start()
                 item_style.DropDownItems.Add(sub)
             menu.Items.Add(item_style)
 
@@ -331,7 +349,7 @@ class Bridge:
             for l, label in [("horizontal", "水平"), ("vertical", "垂直"), ("grid", "网格")]:
                 sub = WinForms.ToolStripMenuItem(label)
                 sub.Checked = (l == curr_layout)
-                sub.Click += lambda s_sender, e_args, val=l: self.set_config("display.layout", val)
+                sub.Click += lambda s_sender, e_args, val=l: threading.Thread(target=self.set_config, args=("display.layout", val), daemon=True).start()
                 item_layout.DropDownItems.Add(sub)
             menu.Items.Add(item_layout)
 
@@ -339,17 +357,17 @@ class Bridge:
 
             # 设置
             item_settings = menu.Items.Add("⚙️ 设置...")
-            item_settings.Click += lambda s, e: self.open_settings_window()
+            item_settings.Click += lambda s, e: threading.Thread(target=self.open_settings_window, daemon=True).start()
 
             # 隐藏窗口
             item_hide = menu.Items.Add("👁 隐藏窗口")
-            item_hide.Click += lambda s, e: self.toggle_visible()
+            item_hide.Click += lambda s, e: threading.Thread(target=self.toggle_visible, daemon=True).start()
 
             menu.Items.Add(WinForms.ToolStripSeparator())
 
             # 退出
             item_quit = menu.Items.Add("❌ 退出")
-            item_quit.Click += lambda s, e: self.quit_app()
+            item_quit.Click += lambda s, e: threading.Thread(target=self.quit_app, daemon=True).start()
 
             pos = WinForms.Control.MousePosition
             menu.Show(pos)

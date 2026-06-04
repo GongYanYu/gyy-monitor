@@ -46,17 +46,27 @@ class MonitorWindow:
         WebView2 控件自身以及主窗体也需要设置背景色为全透明。
         若是 Qt (PyQt5) 后端，在此初始化 Bridge 的主线程辅助器，然后直接跳过。
         """
+        def log_debug(msg):
+            try:
+                with open(r"d:\MyProjects\gyy-monitor\debug.log", "a", encoding="utf-8") as f:
+                    f.write(msg + "\n")
+            except Exception:
+                pass
         try:
+            log_debug(f"[Window] _set_webview_transparent 触发, native={self._window.native}")
             # 检查 native 是否是 WinForms Form 窗口
             native = self._window.native
             if not native:
+                log_debug("[Window] native 窗口不存在，直接返回")
                 return
             native_type_name = type(native).__name__
+            log_debug(f"[Window] native_type_name={native_type_name}")
             if "Form" not in native_type_name:
                 try:
+                    log_debug("[Window] 非 Form 窗口，初始化 Qt 辅助器")
                     self._bridge.init_qt_helper()
                 except Exception as e:
-                    print(f"[Window] 初始化 Qt 线程辅助器失败: {e}")
+                    log_debug(f"[Window] 初始化 Qt 线程辅助器异常: {e}")
                 return
 
             import clr
