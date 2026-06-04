@@ -33,11 +33,10 @@ class MonitorWindow:
             x=win_cfg.get("x"),
             y=win_cfg.get("y"),
             frameless=win_cfg.get("frameless", True),
-            always_on_top=win_cfg.get("always_on_top", True),
+            on_top=win_cfg.get("always_on_top", True),
             transparent=True,
-            background_color="#00000000",  # 完全透明背景
+            background_color="#000000",   # 完全透明背景
             easy_drag=False,               # 由 JS 端处理拖动
-            on_top=True,
             js_api=self._bridge,           # 暴露 Bridge 给 JS
         )
 
