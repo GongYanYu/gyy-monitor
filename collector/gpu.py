@@ -11,11 +11,13 @@ class GpuCollector(BaseCollector):
     """
 
     def __init__(self):
-        self._nvml_available = False
+        self._nvml_init = False     # nvmlInit() 是否成功
+        self._nvml_available = False  # 是否有可用的 GPU 设备
         self._handle = None
         try:
             import pynvml
             pynvml.nvmlInit()
+            self._nvml_init = True
             # 获取第一个 GPU
             count = pynvml.nvmlDeviceGetCount()
             if count > 0:
@@ -82,11 +84,12 @@ class GpuCollector(BaseCollector):
 
     def shutdown(self):
         """释放 NVML 资源。"""
-        if self._nvml_available:
+        if self._nvml_init:
             try:
                 import pynvml
                 pynvml.nvmlShutdown()
             except Exception:
                 pass
             finally:
+                self._nvml_init = False
                 self._nvml_available = False

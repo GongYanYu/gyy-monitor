@@ -50,12 +50,12 @@ class CpuCollector(BaseCollector):
                 if label in temps:
                     entries = temps[label]
                     if entries:
-                        return round(max(e.current for e in entries if e.current), 1)
+                        return round(max(e.current for e in entries if e.current is not None), 1)
 
             # 兜底：取第一个传感器的最高值
             first = next(iter(temps.values()))
             if first:
-                return round(max(e.current for e in first if e.current), 1)
+                return round(max(e.current for e in first if e.current is not None), 1)
 
             return None
         except Exception:
@@ -77,7 +77,7 @@ class CpuCollector(BaseCollector):
                 if label in power:
                     entries = power[label]
                     if entries:
-                        return round(sum(e.current for e in entries if e.current), 1)
+                        return round(sum(e.current for e in entries if e.current is not None), 1)
 
             return None
         except Exception:
@@ -98,7 +98,7 @@ class CpuCollector(BaseCollector):
                 if label in fans:
                     entries = fans[label]
                     if entries:
-                        speeds = [e.current for e in entries if e.current]
+                        speeds = [e.current for e in entries if e.current is not None]
                         if speeds:
                             return max(speeds)
 
@@ -106,7 +106,7 @@ class CpuCollector(BaseCollector):
             for label in fans:
                 entries = fans[label]
                 if entries:
-                    speeds = [e.current for e in entries if e.current]
+                    speeds = [e.current for e in entries if e.current is not None]
                     if speeds:
                         return max(speeds)
 

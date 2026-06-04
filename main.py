@@ -155,18 +155,27 @@ class App:
 
     def _on_toggle(self):
         """托盘：切换窗口显隐。"""
-        self.window.toggle()
+        try:
+            self.window.toggle()
+        except Exception:
+            pass
 
     def _on_open_config(self):
         """托盘：打开配置文件。"""
-        os.startfile(self.config_path)
+        try:
+            os.startfile(self.config_path)
+        except Exception:
+            pass
 
     def _on_style_change(self, style: str):
         """托盘：切换主题风格。"""
         self.config["display"]["style"] = style
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, indent=2, ensure_ascii=False)
-        self.window.push_config(self.config)
+        try:
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, indent=2, ensure_ascii=False)
+            self.window.push_config(self.config)
+        except Exception:
+            pass
 
     def _on_quit(self):
         """托盘：退出应用。"""
