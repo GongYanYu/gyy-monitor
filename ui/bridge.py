@@ -16,20 +16,14 @@ def log_debug(msg):
     except Exception:
         pass
 
-# 针对 PyQt5 的全局线程安全辅助器类型（必须定义在模块级，不能定义在局部函数内）
-QtThreadHelper = None
+# 针对 PyQt5 的全局跨线程自定义事件类
+CallbackEvent = None
 try:
-    from PyQt5.QtCore import QObject, pyqtSignal
-    class QtThreadHelper(QObject):
-        trigger = pyqtSignal(object)
-        def __init__(self):
-            super().__init__()
-            self.trigger.connect(self._run)
-        def _run(self, callback):
-            try:
-                callback()
-            except Exception as err:
-                print(f"[QtThreadHelper] 执行主线程回调错误: {err}")
+    from PyQt5.QtCore import QEvent
+    class CallbackEvent(QEvent):
+        def __init__(self, callback):
+            super().__init__(QEvent.Type(QEvent.User + 1234))
+            self.callback = callback
 except ImportError:
     pass
 
@@ -57,21 +51,36 @@ class Bridge:
         self._window = window
 
     def init_qt_helper(self):
-        """在 Qt 主 GUI 线程中初始化线程辅助器。"""
-        log_debug(f"[Bridge] init_qt_helper 被调用, QtThreadHelper 存在={QtThreadHelper is not None}")
+        """注入主事件循环的回调处理器。"""
+        log_debug(f"[Bridge] init_qt_helper 被调用, self._qt_helper 存在={self._qt_helper is not None}")
         if self._qt_helper:
             log_debug("[Bridge] _qt_helper 已存在，跳过初始化")
             return
-        if QtThreadHelper:
-            try:
-                from PyQt5.QtWidgets import QApplication
-                self._qt_helper = QtThreadHelper()
-                # 强行将辅助对象移至 Qt 主 GUI 线程，确保信号连接被派遣到主线程执行
-                main_thread = QApplication.instance().thread()
-                self._qt_helper.moveToThread(main_thread)
-                log_debug("[Bridge] PyQt5 线程辅助器实例化成功，并已移至主 GUI 线程！")
-            except Exception as e:
-                log_debug(f"[Bridge] 初始化 Qt 线程辅助器失败: {e}")
+        native = self._window.native
+        if not native:
+            log_debug("[Bridge] native 窗口为 None，注入失败")
+            return
+        try:
+            from PyQt5.QtCore import QEvent
+            # 保存原有的 customEvent 处理器
+            old_custom_event = native.customEvent if hasattr(native, 'customEvent') else None
+            
+            def new_custom_event(event):
+                if event.type() == QEvent.User + 1234:
+                    try:
+                        event.callback()
+                    except Exception as err:
+                        log_debug(f"[customEvent] 执行回调失败: {err}")
+                    return True
+                if old_custom_event:
+                    return old_custom_event(event)
+                return False
+                
+            native.customEvent = new_custom_event
+            self._qt_helper = True
+            log_debug("[Bridge] 成功向 Qt 主窗口注入 customEvent 处理器！")
+        except Exception as e:
+            log_debug(f"[Bridge] 注入 customEvent 处理器失败: {e}")
 
     def set_on_config_changed(self, callback):
         """设置配置变更回调。"""
@@ -208,11 +217,13 @@ class Bridge:
         # 1. PyQt5 / PySide2 QMainWindow (pywebview 类名为 BrowserView)
         if "BrowserView" in native_type or "QMainWindow" in native_type or hasattr(native, 'winId'):
             log_debug(f"[Bridge] 匹配到 Qt 后端，_qt_helper 存在={self._qt_helper is not None}")
-            if self._qt_helper:
-                log_debug("[Bridge] 发射信号给主线程执行 _show_qt_menu")
-                self._qt_helper.trigger.emit(self._show_qt_menu)
+            if self._qt_helper and CallbackEvent:
+                log_debug("[Bridge] 通过 QCoreApplication.postEvent 将回调发送到主线程")
+                from PyQt5.QtCore import QCoreApplication
+                event = CallbackEvent(self._show_qt_menu)
+                QCoreApplication.postEvent(native, event)
             else:
-                log_debug("[Bridge] _qt_helper 不存在，尝试在当前线程直接执行 _show_qt_menu (可能会崩溃)")
+                log_debug("[Bridge] 辅助器或事件类未就绪，尝试在当前线程执行 _show_qt_menu (可能会崩溃)")
                 self._show_qt_menu()
 
         # 2. WinForms Form
