@@ -72,10 +72,8 @@ class Bridge:
                         event.callback()
                     except Exception as err:
                         log_debug(f"[customEvent] 执行回调失败: {err}")
-                    return True
-                if old_custom_event:
-                    return old_custom_event(event)
-                return False
+                elif old_custom_event:
+                    old_custom_event(event)
                 
             native.customEvent = new_custom_event
             self._qt_helper = True
