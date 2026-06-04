@@ -25,6 +25,24 @@ class Bridge:
         self._on_quit_callback = None   # 退出应用回调
         self._settings_window = None    # 设置窗口实例
 
+        # 线程安全辅助器 (针对 PyQt5 GUI 线程限制，保证跨线程 GUI 呼叫不崩溃)
+        self._qt_helper = None
+        try:
+            from PyQt5.QtCore import QObject, pyqtSignal
+            class QtThreadHelper(QObject):
+                trigger = pyqtSignal(object)
+                def __init__(self):
+                    super().__init__()
+                    self.trigger.connect(self._run)
+                def _run(self, callback):
+                    try:
+                        callback()
+                    except Exception as err:
+                        print(f"[QtThreadHelper] 执行主线程回调错误: {err}")
+            self._qt_helper = QtThreadHelper()
+        except Exception:
+            pass
+
     def bind_window(self, window):
         """绑定 pywebview 窗口实例。"""
         self._window = window
@@ -148,7 +166,7 @@ class Bridge:
             return None
 
     def show_context_menu(self):
-        """显示原生右键菜单（防止 HTML 弹出菜单超出窗口边界被截断）。"""
+        """显示原生右键菜单（通过主线程机制防止跨线程 GUI 调用导致 Python 崩溃）。"""
         if not self._window:
             return
 
@@ -160,117 +178,139 @@ class Bridge:
 
         # 1. PyQt5 / PySide2 QMainWindow (pywebview 类名为 BrowserView)
         if "BrowserView" in native_type or "QMainWindow" in native_type or hasattr(native, 'winId'):
-            try:
-                from PyQt5.QtWidgets import QMenu, QAction
-                from PyQt5.QtGui import QCursor
-
-                menu = QMenu()
-
-                # 点击穿透
-                click_through = self._config["window"].get("click_through", False)
-                txt_through = "🔲 关闭穿透" if click_through else "🔳 开启穿透"
-                act_through = QAction(txt_through, menu)
-                act_through.triggered.connect(lambda: self.toggle_click_through(not click_through))
-                menu.addAction(act_through)
-
-                menu.addSeparator()
-
-                # 风格子菜单
-                style_menu = menu.addMenu("🎨 风格")
-                curr_style = self._config["display"].get("style", "minimal")
-                for s, label in [("minimal", "极简数字"), ("glass", "暗色玻璃"), ("hacker", "终端黑客")]:
-                    act = QAction(label, style_menu, checkable=True, checked=(s == curr_style))
-                    act.triggered.connect(lambda checked, val=s: self.set_config("display.style", val))
-                    style_menu.addAction(act)
-
-                # 布局子菜单
-                layout_menu = menu.addMenu("📐 布局")
-                curr_layout = self._config["display"].get("layout", "horizontal")
-                for l, label in [("horizontal", "水平"), ("vertical", "垂直"), ("grid", "网格")]:
-                    act = QAction(label, layout_menu, checkable=True, checked=(l == curr_layout))
-                    act.triggered.connect(lambda checked, val=l: self.set_config("display.layout", val))
-                    layout_menu.addAction(act)
-
-                menu.addSeparator()
-
-                # 设置
-                act_settings = QAction("⚙️ 设置...", menu)
-                act_settings.triggered.connect(self.open_settings_window)
-                menu.addAction(act_settings)
-
-                # 隐藏窗口
-                act_hide = QAction("👁 隐藏窗口", menu)
-                act_hide.triggered.connect(self.toggle_visible)
-                menu.addAction(act_hide)
-
-                menu.addSeparator()
-
-                # 退出
-                act_quit = QAction("❌ 退出", menu)
-                act_quit.triggered.connect(self.quit_app)
-                menu.addAction(act_quit)
-
-                menu.exec_(QCursor.pos())
-            except Exception as e:
-                print(f"[Bridge] 弹出 PyQt5 右键菜单失败: {e}")
+            if self._qt_helper:
+                # 通过信号发射，强行让菜单渲染运行在 Qt 的主 GUI 线程上，避免 C++ 线程冲突崩溃
+                self._qt_helper.trigger.emit(self._show_qt_menu)
+            else:
+                self._show_qt_menu()
 
         # 2. WinForms Form
         elif "Form" in native_type:
             try:
                 import clr
                 clr.AddReference("System.Windows.Forms")
-                import System.Windows.Forms as WinForms
-
-                menu = WinForms.ContextMenuStrip()
-
-                # 点击穿透
-                click_through = self._config["window"].get("click_through", False)
-                txt_through = "🔲 关闭穿透" if click_through else "🔳 开启穿透"
-                item_through = menu.Items.Add(txt_through)
-                item_through.Click += lambda s, e: self.toggle_click_through(not click_through)
-
-                menu.Items.Add(WinForms.ToolStripSeparator())
-
-                # 风格
-                item_style = WinForms.ToolStripMenuItem("🎨 风格")
-                curr_style = self._config["display"].get("style", "minimal")
-                for s, label in [("minimal", "极简数字"), ("glass", "暗色玻璃"), ("hacker", "终端黑客")]:
-                    sub = WinForms.ToolStripMenuItem(label)
-                    sub.Checked = (s == curr_style)
-                    sub.Click += lambda s_sender, e_args, val=s: self.set_config("display.style", val)
-                    item_style.DropDownItems.Add(sub)
-                menu.Items.Add(item_style)
-
-                # 布局
-                item_layout = WinForms.ToolStripMenuItem("📐 布局")
-                curr_layout = self._config["display"].get("layout", "horizontal")
-                for l, label in [("horizontal", "水平"), ("vertical", "垂直"), ("grid", "网格")]:
-                    sub = WinForms.ToolStripMenuItem(label)
-                    sub.Checked = (l == curr_layout)
-                    sub.Click += lambda s_sender, e_args, val=l: self.set_config("display.layout", val)
-                    item_layout.DropDownItems.Add(sub)
-                menu.Items.Add(item_layout)
-
-                menu.Items.Add(WinForms.ToolStripSeparator())
-
-                # 设置
-                item_settings = menu.Items.Add("⚙️ 设置...")
-                item_settings.Click += lambda s, e: self.open_settings_window()
-
-                # 隐藏窗口
-                item_hide = menu.Items.Add("👁 隐藏窗口")
-                item_hide.Click += lambda s, e: self.toggle_visible()
-
-                menu.Items.Add(WinForms.ToolStripSeparator())
-
-                # 退出
-                item_quit = menu.Items.Add("❌ 退出")
-                item_quit.Click += lambda s, e: self.quit_app()
-
-                pos = WinForms.Control.MousePosition
-                menu.Show(pos)
+                from System import Action
+                # WinForms 跨线程调用需使用 Invoke
+                if native.InvokeRequired:
+                    native.Invoke(Action(self._show_winforms_menu))
+                else:
+                    self._show_winforms_menu()
             except Exception as e:
-                print(f"[Bridge] 弹出 WinForms 右键菜单失败: {e}")
+                print(f"[Bridge] 跨线程调用 WinForms 菜单失败: {e}")
+
+    def _show_qt_menu(self):
+        """在 Qt 主 GUI 线程渲染并弹出右键菜单。"""
+        try:
+            from PyQt5.QtWidgets import QMenu, QAction
+            from PyQt5.QtGui import QCursor
+
+            menu = QMenu()
+
+            # 点击穿透
+            click_through = self._config["window"].get("click_through", False)
+            txt_through = "🔲 关闭穿透" if click_through else "🔳 开启穿透"
+            act_through = QAction(txt_through, menu)
+            act_through.triggered.connect(lambda: self.toggle_click_through(not click_through))
+            menu.addAction(act_through)
+
+            menu.addSeparator()
+
+            # 风格子菜单
+            style_menu = menu.addMenu("🎨 风格")
+            curr_style = self._config["display"].get("style", "minimal")
+            for s, label in [("minimal", "极简数字"), ("glass", "暗色玻璃"), ("hacker", "终端黑客")]:
+                act = QAction(label, style_menu, checkable=True, checked=(s == curr_style))
+                act.triggered.connect(lambda checked, val=s: self.set_config("display.style", val))
+                style_menu.addAction(act)
+
+            # 布局子菜单
+            layout_menu = menu.addMenu("📐 布局")
+            curr_layout = self._config["display"].get("layout", "horizontal")
+            for l, label in [("horizontal", "水平"), ("vertical", "垂直"), ("grid", "网格")]:
+                act = QAction(label, layout_menu, checkable=True, checked=(l == curr_layout))
+                act.triggered.connect(lambda checked, val=l: self.set_config("display.layout", val))
+                layout_menu.addAction(act)
+
+            menu.addSeparator()
+
+            # 设置
+            act_settings = QAction("⚙️ 设置...", menu)
+            act_settings.triggered.connect(self.open_settings_window)
+            menu.addAction(act_settings)
+
+            # 隐藏窗口
+            act_hide = QAction("👁 隐藏窗口", menu)
+            act_hide.triggered.connect(self.toggle_visible)
+            menu.addAction(act_hide)
+
+            menu.addSeparator()
+
+            # 退出
+            act_quit = QAction("❌ 退出", menu)
+            act_quit.triggered.connect(self.quit_app)
+            menu.addAction(act_quit)
+
+            menu.exec_(QCursor.pos())
+        except Exception as e:
+            print(f"[Bridge] 弹出 PyQt5 右键菜单失败: {e}")
+
+    def _show_winforms_menu(self):
+        """在 WinForms 主 GUI 线程渲染并弹出右键菜单。"""
+        try:
+            import clr
+            clr.AddReference("System.Windows.Forms")
+            import System.Windows.Forms as WinForms
+
+            menu = WinForms.ContextMenuStrip()
+
+            # 点击穿透
+            click_through = self._config["window"].get("click_through", False)
+            txt_through = "🔲 关闭穿透" if click_through else "🔳 开启穿透"
+            item_through = menu.Items.Add(txt_through)
+            item_through.Click += lambda s, e: self.toggle_click_through(not click_through)
+
+            menu.Items.Add(WinForms.ToolStripSeparator())
+
+            # 风格
+            item_style = WinForms.ToolStripMenuItem("🎨 风格")
+            curr_style = self._config["display"].get("style", "minimal")
+            for s, label in [("minimal", "极简数字"), ("glass", "暗色玻璃"), ("hacker", "终端黑客")]:
+                sub = WinForms.ToolStripMenuItem(label)
+                sub.Checked = (s == curr_style)
+                sub.Click += lambda s_sender, e_args, val=s: self.set_config("display.style", val)
+                item_style.DropDownItems.Add(sub)
+            menu.Items.Add(item_style)
+
+            # 布局
+            item_layout = WinForms.ToolStripMenuItem("📐 布局")
+            curr_layout = self._config["display"].get("layout", "horizontal")
+            for l, label in [("horizontal", "水平"), ("vertical", "垂直"), ("grid", "网格")]:
+                sub = WinForms.ToolStripMenuItem(label)
+                sub.Checked = (l == curr_layout)
+                sub.Click += lambda s_sender, e_args, val=l: self.set_config("display.layout", val)
+                item_layout.DropDownItems.Add(sub)
+            menu.Items.Add(item_layout)
+
+            menu.Items.Add(WinForms.ToolStripSeparator())
+
+            # 设置
+            item_settings = menu.Items.Add("⚙️ 设置...")
+            item_settings.Click += lambda s, e: self.open_settings_window()
+
+            # 隐藏窗口
+            item_hide = menu.Items.Add("👁 隐藏窗口")
+            item_hide.Click += lambda s, e: self.toggle_visible()
+
+            menu.Items.Add(WinForms.ToolStripSeparator())
+
+            # 退出
+            item_quit = menu.Items.Add("❌ 退出")
+            item_quit.Click += lambda s, e: self.quit_app()
+
+            pos = WinForms.Control.MousePosition
+            menu.Show(pos)
+        except Exception as e:
+            print(f"[Bridge] 弹出 WinForms 右键菜单失败: {e}")
 
     def open_settings_window(self):
         """打开设置窗口。"""
