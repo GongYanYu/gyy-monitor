@@ -44,7 +44,7 @@ class MonitorWindow:
 
         pywebview transparent=True 在 WinForms 下只设置了窗口样式，
         WebView2 控件自身以及主窗体也需要设置背景色为全透明。
-        若是 Qt (PyQt5) 后端，pywebview 已原生支持透明，直接跳过。
+        若是 Qt (PyQt5) 后端，在此初始化 Bridge 的主线程辅助器，然后直接跳过。
         """
         try:
             # 检查 native 是否是 WinForms Form 窗口
@@ -53,6 +53,10 @@ class MonitorWindow:
                 return
             native_type_name = type(native).__name__
             if "Form" not in native_type_name:
+                try:
+                    self._bridge.init_qt_helper()
+                except Exception as e:
+                    print(f"[Window] 初始化 Qt 线程辅助器失败: {e}")
                 return
 
             import clr
@@ -94,7 +98,7 @@ class MonitorWindow:
             return
         import json
         try:
-            self._window.evaluate_js(
+            self._window.run_js(
                 "window.updateMetrics && window.updateMetrics("
                 + json.dumps(data, ensure_ascii=False) + ")"
             )
@@ -106,7 +110,7 @@ class MonitorWindow:
             return
         import json
         try:
-            self._window.evaluate_js(
+            self._window.run_js(
                 "window.updateConfig && window.updateConfig("
                 + json.dumps(config, ensure_ascii=False) + ")"
             )
