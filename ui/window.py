@@ -33,28 +33,61 @@ class MonitorWindow:
 
         self._bridge.bind_window(self._window)
 
-        # WebView2 透明：设置背景色 alpha=0
-        self._set_webview_transparent()
+        # 监听 shown 事件，在窗口显示后设置 WebView2 背景透明
+        self._window.events.shown += self._set_webview_transparent
 
         if win_cfg.get("click_through", False):
             self._bridge.toggle_click_through(True)
 
-    def _set_webview_transparent(self):
+    def _set_webview_transparent(self, *args, **kwargs):
         """设置 WebView2 背景透明。
 
-        pywebview transparent=True 只设置了窗口样式，
-        WebView2 控制器自身也需要设置背景色为全透明。
+        pywebview transparent=True 在 WinForms 下只设置了窗口样式，
+        WebView2 控件自身以及主窗体也需要设置背景色为全透明。
+        若是 Qt (PyQt5) 后端，pywebview 已原生支持透明，直接跳过。
         """
         try:
-            # pywebview 6.x 内部: _edge_holder 持有 EdgeChrome 实例
-            edge = getattr(self._window, '_edge_holder', None)
-            if edge is None:
+            # 检查 native 是否是 WinForms Form 窗口
+            native = self._window.native
+            if not native:
                 return
-            # CoreWebView2Controller2.put_DefaultBackgroundColor(0) = 全透明
-            ctrl = edge.GetCoreWebView2Controller2()
-            ctrl.put_DefaultBackgroundColor(0)  # 0 = RGBA(0,0,0,0)
-        except Exception:
-            pass
+            native_type_name = type(native).__name__
+            if "Form" not in native_type_name:
+                return
+
+            import clr
+            clr.AddReference("System.Drawing")
+            import System.Drawing
+            import ctypes
+
+            # 获取 WinForms BrowserForm 并设置背景色为黑色（DWM 开启模糊后黑色会被透明化）
+            browser_form = native
+            browser_form.BackColor = System.Drawing.Color.Black
+
+            # 获取 WebView2 控件并将其背景色设为透明色
+            webview_control = browser_form.Controls[0]
+            webview_control.DefaultBackgroundColor = System.Drawing.Color.Transparent
+
+            # 获取窗体句柄 HWND 并使用 DWM API 开启全窗口的背景磨砂透明
+            hwnd = browser_form.Handle.ToInt64()
+
+            class DWM_BLURBEHIND(ctypes.Structure):
+                _fields_ = [
+                    ("dwFlags", ctypes.c_ulong),
+                    ("fEnable", ctypes.c_bool),
+                    ("hRgnBlur", ctypes.c_void_p),
+                    ("fTransitionOnMaximized", ctypes.c_bool),
+                ]
+
+            dwmapi = ctypes.windll.dwmapi
+            bb = DWM_BLURBEHIND()
+            bb.dwFlags = 1  # DWM_BB_ENABLE
+            bb.fEnable = True
+            bb.hRgnBlur = ctypes.c_void_p(0)
+
+            dwmapi.DwmEnableBlurBehindWindow(ctypes.c_void_p(hwnd), ctypes.byref(bb))
+        except Exception as e:
+            print(f"[Window] 设置 WebView2 背景透明失败: {e}")
 
     def push_metrics(self, data: dict):
         if not self._window:

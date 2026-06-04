@@ -111,8 +111,17 @@ class App:
         self.tray.create()
         tray_thread = self.tray.run_in_thread()
 
+        # 尝试使用 PyQt5 作为 GUI 后端，以在 Windows 下完美支持透明背景
+        gui_backend = None
+        try:
+            import PyQt5
+            gui_backend = 'qt'
+            print("[Main] 检测到 PyQt5 已安装，使用 qt 渲染后端以实现透明背景")
+        except ImportError:
+            print("[Main] 未检测到 PyQt5，使用默认 winforms 渲染后端")
+
         # 进入 pywebview 消息循环（阻塞）
-        webview.start(debug=False)
+        webview.start(gui=gui_backend, debug=False)
 
         # 清理
         self._running = False

@@ -152,7 +152,16 @@ class Bridge:
             WS_EX_LAYERED = 0x00080000
             WS_EX_TOOLWINDOW = 0x00000080
 
-            hwnd = self._window._html.hwnd if hasattr(self._window, '_html') else None
+            hwnd = None
+            if hasattr(self._window, 'native') and self._window.native:
+                native = self._window.native
+                # WinForms
+                if hasattr(native, 'Handle'):
+                    hwnd = native.Handle.ToInt64()
+                # Qt
+                elif hasattr(native, 'winId'):
+                    hwnd = int(native.winId())
+
             if not hwnd:
                 # 尝试通过 ctypes 查找窗口
                 user32 = ctypes.windll.user32
