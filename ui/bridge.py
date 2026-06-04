@@ -9,6 +9,23 @@ import sys
 import winreg
 from pathlib import Path
 
+# 针对 PyQt5 的全局线程安全辅助器类型（必须定义在模块级，不能定义在局部函数内）
+QtThreadHelper = None
+try:
+    from PyQt5.QtCore import QObject, pyqtSignal
+    class QtThreadHelper(QObject):
+        trigger = pyqtSignal(object)
+        def __init__(self):
+            super().__init__()
+            self.trigger.connect(self._run)
+        def _run(self, callback):
+            try:
+                callback()
+            except Exception as err:
+                print(f"[QtThreadHelper] 执行主线程回调错误: {err}")
+except ImportError:
+    pass
+
 
 class Bridge:
     """暴露给前端 JS 的 API 类。
@@ -25,27 +42,23 @@ class Bridge:
         self._on_quit_callback = None   # 退出应用回调
         self._settings_window = None    # 设置窗口实例
 
-        # 线程安全辅助器 (针对 PyQt5 GUI 线程限制，保证跨线程 GUI 呼叫不崩溃)
+        # 线程安全辅助器 (针对 PyQt5 GUI 线程限制，将在 shown 事件中由主 GUI 线程初始化)
         self._qt_helper = None
-        try:
-            from PyQt5.QtCore import QObject, pyqtSignal
-            class QtThreadHelper(QObject):
-                trigger = pyqtSignal(object)
-                def __init__(self):
-                    super().__init__()
-                    self.trigger.connect(self._run)
-                def _run(self, callback):
-                    try:
-                        callback()
-                    except Exception as err:
-                        print(f"[QtThreadHelper] 执行主线程回调错误: {err}")
-            self._qt_helper = QtThreadHelper()
-        except Exception:
-            pass
 
     def bind_window(self, window):
         """绑定 pywebview 窗口实例。"""
         self._window = window
+
+    def init_qt_helper(self):
+        """在 Qt 主 GUI 线程中初始化线程辅助器。"""
+        if self._qt_helper:
+            return
+        if QtThreadHelper:
+            try:
+                self._qt_helper = QtThreadHelper()
+                print("[Bridge] PyQt5 线程辅助器已在主 GUI 线程中初始化")
+            except Exception as e:
+                print(f"[Bridge] 初始化 Qt 线程辅助器失败: {e}")
 
     def set_on_config_changed(self, callback):
         """设置配置变更回调。"""
