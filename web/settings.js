@@ -12,7 +12,11 @@ const app = createApp({
         draggable: true, opacity: 1.0, frameless: true,
       },
       display: {
-        style: 'minimal', layout: 'horizontal',
+        background_color: '#1e1e2e',
+        background_opacity: 0.85,
+        blur_radius: 10.0,
+        effect_type: 'acrylic',
+        layout: 'horizontal',
         custom_css: null, font_size: 14, gap: 18, padding: 8,
       },
       metrics: [],

@@ -11,7 +11,10 @@
     "frameless": true
   },
   "display": {
-    "style": "glass",
+    "background_color": "#1e1e2e",
+    "background_opacity": 0.85,
+    "blur_radius": 10.0,
+    "effect_type": "acrylic",
     "layout": "horizontal",
     "custom_css": null,
     "font_size": 14,

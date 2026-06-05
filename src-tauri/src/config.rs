@@ -23,7 +23,10 @@ pub struct WindowConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct DisplayConfig {
-    pub style: String,
+    pub background_color: String,
+    pub background_opacity: f64,
+    pub blur_radius: f64,
+    pub effect_type: String,
     pub layout: String,
     pub custom_css: Option<String>,
     pub font_size: f64,
@@ -68,7 +71,10 @@ impl Default for Config {
                 frameless: true,
             },
             display: DisplayConfig {
-                style: "minimal".to_string(),
+                background_color: "#1e1e2e".to_string(),
+                background_opacity: 0.85,
+                blur_radius: 10.0,
+                effect_type: "acrylic".to_string(),
                 layout: "horizontal".to_string(),
                 custom_css: None,
                 font_size: 14.0,

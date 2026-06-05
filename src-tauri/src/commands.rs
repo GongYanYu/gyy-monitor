@@ -21,6 +21,23 @@ fn update_json_value(root: &mut serde_json::Value, parts: &[&str], value: serde_
     }
 }
 
+pub fn apply_vibrancy(window: &tauri::WebviewWindow, effect_type: &str) {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = window_vibrancy::clear_mica(window);
+        let _ = window_vibrancy::clear_acrylic(window);
+        match effect_type {
+            "mica" => {
+                let _ = window_vibrancy::apply_mica(window, Some(true));
+            }
+            "acrylic" => {
+                let _ = window_vibrancy::apply_acrylic(window, Some((20, 20, 20, 10)));
+            }
+            _ => {}
+        }
+    }
+}
+
 #[tauri::command]
 pub fn get_config(state: tauri::State<'_, AppState>) -> Config {
     state.config.lock().unwrap().clone()
@@ -55,6 +72,12 @@ pub fn set_config(
     } else if key == "window.click_through" {
         if let Some(through) = value.as_bool() {
             let _ = window.set_ignore_cursor_events(through);
+        }
+    } else if key == "display.effect_type" {
+        if let Some(eff) = value.as_str() {
+            if let Some(main_win) = window.get_webview_window("main") {
+                apply_vibrancy(&main_win, eff);
+            }
         }
     }
 
@@ -107,6 +130,11 @@ pub fn set_config_bulk(
     let _ = window.set_always_on_top(current_config.window.always_on_top);
     let _ = window.set_ignore_cursor_events(current_config.window.click_through);
 
+    // Apply vibrancy to main window
+    if let Some(main_win) = window.get_webview_window("main") {
+        apply_vibrancy(&main_win, &current_config.display.effect_type);
+    }
+
     // Save to file
     save_config(&current_config).map_err(|e| e.to_string())?;
 
@@ -150,6 +178,11 @@ pub fn apply_config_temp(
     // Temporary window style adjustments (no save)
     let _ = window.set_always_on_top(current_config.window.always_on_top);
     let _ = window.set_ignore_cursor_events(current_config.window.click_through);
+
+    // Apply vibrancy to main window for preview
+    if let Some(main_win) = window.get_webview_window("main") {
+        apply_vibrancy(&main_win, &current_config.display.effect_type);
+    }
 
     // Notify frontend to preview styles
     let _ = window.emit("config-changed", &*current_config);
@@ -239,6 +272,7 @@ pub fn open_settings_window(app_handle: tauri::AppHandle, state: tauri::State<'_
                 // Notify main window to revert styles
                 if let Some(main_win) = app_clone.get_webview_window("main") {
                     let _ = main_win.emit("config-changed", &saved_config);
+                    apply_vibrancy(&main_win, &saved_config.display.effect_type);
                 }
             }
         });
@@ -266,20 +300,6 @@ pub fn show_context_menu(window: tauri::Window) -> Result<(), String> {
     let toggle_click_through_i = MenuItem::with_id(app_handle, "toggle_click_through", "🔳 开启/关闭穿透", true, None::<&str>)
         .map_err(|e| e.to_string())?;
     
-    let style_minimal_i = MenuItem::with_id(app_handle, "style_minimal", "极简数字", true, None::<&str>)
-        .map_err(|e| e.to_string())?;
-    let style_glass_i = MenuItem::with_id(app_handle, "style_glass", "暗色玻璃", true, None::<&str>)
-        .map_err(|e| e.to_string())?;
-    let style_hacker_i = MenuItem::with_id(app_handle, "style_hacker", "终端黑客", true, None::<&str>)
-        .map_err(|e| e.to_string())?;
-    
-    let style_submenu = SubmenuBuilder::new(app_handle, "🎨 风格")
-        .item(&style_minimal_i)
-        .item(&style_glass_i)
-        .item(&style_hacker_i)
-        .build()
-        .map_err(|e| e.to_string())?;
-
     let layout_horizontal_i = MenuItem::with_id(app_handle, "layout_horizontal", "水平", true, None::<&str>)
         .map_err(|e| e.to_string())?;
     let layout_vertical_i = MenuItem::with_id(app_handle, "layout_vertical", "垂直", true, None::<&str>)
@@ -304,7 +324,6 @@ pub fn show_context_menu(window: tauri::Window) -> Result<(), String> {
     let menu = MenuBuilder::new(app_handle)
         .item(&toggle_click_through_i)
         .separator()
-        .item(&style_submenu)
         .item(&layout_submenu)
         .separator()
         .item(&settings_i)

@@ -25,7 +25,11 @@ const app = createApp({
           draggable: true, opacity: 1.0, frameless: true,
         },
         display: {
-          style: 'minimal', layout: 'horizontal',
+          background_color: '#1e1e2e',
+          background_opacity: 0.85,
+          blur_radius: 10.0,
+          effect_type: 'acrylic',
+          layout: 'horizontal',
           custom_css: null, font_size: 14, gap: 18, padding: 8,
         },
         metrics: [
@@ -55,12 +59,36 @@ const app = createApp({
       });
     });
 
+    function hexToRgba(hex, opacity) {
+      if (!hex) return `rgba(30, 30, 46, ${opacity})`;
+      let c = hex.substring(1);
+      if (c.length === 3) {
+        c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+      }
+      const r = parseInt(c.substring(0, 2), 16);
+      const g = parseInt(c.substring(2, 4), 16);
+      const b = parseInt(c.substring(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+
     const containerStyle = computed(() => {
       const d = config.value.display;
+      const bgOpacity = d.background_opacity ?? 0.85;
+      const bgColor = d.background_color ?? '#1e1e2e';
+      const blur = d.blur_radius ?? 10.0;
+      
+      const rgbaBg = hexToRgba(bgColor, bgOpacity);
+      const hasBgOrBlur = bgOpacity > 0 || blur > 0;
+
       return {
         gap: (d.gap || 18) + 'px',
         padding: (d.padding || 8) + 'px',
         fontSize: (d.font_size || 14) + 'px',
+        background: rgbaBg,
+        backdropFilter: blur > 0 ? `blur(${blur}px)` : 'none',
+        webkitBackdropFilter: blur > 0 ? `blur(${blur}px)` : 'none',
+        borderColor: hasBgOrBlur ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+        boxShadow: hasBgOrBlur ? '0 8px 32px rgba(0, 0, 0, 0.3)' : 'none',
       };
     });
 
@@ -76,10 +104,6 @@ const app = createApp({
       if (isNaN(num)) return '--';
       const decimals = metricDef.decimals ?? 0;
       return num.toFixed(decimals);
-    }
-
-    function styleLabel(s) {
-      return { minimal: '极简数字', glass: '暗色玻璃', hacker: '终端黑客' }[s] || s;
     }
 
     function layoutLabel(l) {
@@ -113,19 +137,6 @@ const app = createApp({
         } else if (window.pywebview) {
           await pywebview.api.set_config('window.click_through', newVal);
           await pywebview.api.toggle_click_through(newVal);
-        }
-      } catch (e) { console.warn('Bridge 调用失败:', e); }
-    }
-
-    async function setStyle(style) {
-      config.value.display.style = style;
-      menuVisible.value = false;
-      loadThemeStyle(style);
-      try {
-        if (window.__TAURI__) {
-          await window.__TAURI__.core.invoke('set_config', { key: 'display.style', value: style });
-        } else if (window.pywebview) {
-          await pywebview.api.set_config('display.style', style);
         }
       } catch (e) { console.warn('Bridge 调用失败:', e); }
     }
@@ -213,11 +224,6 @@ const app = createApp({
       dragging = false;
     }
     // 窗口大小现已完全由内容和全透明窗口容器自适应撑开
-    // === 主题加载 ===
-    function loadThemeStyle(style) {
-      const link = document.getElementById('theme-style');
-      if (link) link.href = 'themes/' + style + '.css';
-    }
 
     // === 初始化 ===
     onMounted(async () => {
@@ -234,9 +240,6 @@ const app = createApp({
           console.warn('无法从后端加载配置，使用默认值:', e);
         }
 
-        // 加载主题
-        loadThemeStyle(config.value.display.style);
-
         // 监听来自 Rust 的指标高频推送
         listen('metrics-update', async (event) => {
           metrics.value = { ...metrics.value, ...event.payload };
@@ -245,8 +248,25 @@ const app = createApp({
         // 监听来自 Rust 的配置更新（托盘菜单/设置窗口触发的修改）
         listen('config-changed', async (event) => {
           config.value = { ...config.value, ...event.payload };
-          loadThemeStyle(config.value.display.style);
         });
+
+        // 监听容器大小并自适应窗口物理尺寸
+        const container = document.querySelector('.monitor-container');
+        if (container) {
+          const resizeObserver = new ResizeObserver((entries) => {
+            for (let entry of entries) {
+              const rect = entry.target.getBoundingClientRect();
+              // 设定最小值以确保稳定性
+              const width = Math.max(100, Math.ceil(rect.width));
+              const height = Math.max(30, Math.ceil(rect.height));
+              
+              invoke('resize_window_to_fit', { width, height }).catch((err) => {
+                console.warn('调整窗口大小失败:', err);
+              });
+            }
+          });
+          resizeObserver.observe(container);
+        }
 
       } else {
         // 2. 否则，如果是 pywebview 环境（兜底）
@@ -265,9 +285,6 @@ const app = createApp({
         } catch (e) {
           console.warn('无法从后端加载配置，使用默认值:', e);
         }
-
-        // 加载主题
-        loadThemeStyle(config.value.display.style);
 
         // 暴露 updateMetrics 供 Python 调用
         window.updateMetrics = async (data) => {
@@ -301,8 +318,8 @@ const app = createApp({
     return {
       config, metrics, menuVisible, menuX, menuY,
       enabledMetrics, containerStyle, cardStyle,
-      formatValue, styleLabel, layoutLabel,
-      showMenu, toggleClickThrough, setStyle, setLayout,
+      formatValue, layoutLabel,
+      showMenu, toggleClickThrough, setLayout,
       openConfig, hideWindow, onMouseDown, openSettings
     };
   },

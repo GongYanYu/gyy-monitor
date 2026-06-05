@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>gyy-monitor</title>
   <link rel="stylesheet" href="style.css">
-  <link id="theme-style" rel="stylesheet" href="themes/minimal.css">
 </head>
 <body>
   <div id="app">
@@ -27,39 +26,6 @@
         <span class="metric-label" data-tauri-drag-region>{{ item.label }}</span>
         <span class="metric-value" :style="{ color: item.color }" data-tauri-drag-region>{{ formatValue(metrics[item.id], item) }}<span class="metric-unit" v-if="item.unit" data-tauri-drag-region>{{ item.unit }}</span></span>
       </div>
-    </div>
-
-    <!-- 右键菜单 -->
-    <div
-      v-if="menuVisible"
-      class="context-menu"
-      :style="{ left: menuX + 'px', top: menuY + 'px' }"
-      @mouseleave="menuVisible = false"
-    >
-      <div class="menu-item" @click="toggleClickThrough">
-        {{ config.window.click_through ? '🔲 关闭穿透' : '🔳 开启穿透' }}
-      </div>
-      <div class="menu-separator"></div>
-      <div class="menu-label">风格</div>
-      <div
-        v-for="s in ['minimal', 'glass', 'hacker']"
-        :key="s"
-        class="menu-item"
-        :class="{ active: config.display.style === s }"
-        @click="setStyle(s)"
-      >{{ styleLabel(s) }}</div>
-      <div class="menu-separator"></div>
-      <div class="menu-label">布局</div>
-      <div
-        v-for="l in ['horizontal', 'vertical', 'grid']"
-        :key="l"
-        class="menu-item"
-        :class="{ active: config.display.layout === l }"
-        @click="setLayout(l)"
-      >{{ layoutLabel(l) }}</div>
-      <div class="menu-separator"></div>
-      <div class="menu-item" @click="openConfig">📝 编辑配置</div>
-      <div class="menu-item" @click="hideWindow">👁 隐藏窗口</div>
     </div>
   </div>
 

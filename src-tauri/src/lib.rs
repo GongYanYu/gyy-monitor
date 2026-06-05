@@ -90,25 +90,13 @@ pub fn run() {
                 // Apply Acrylic/Mica effects on Windows
                 #[cfg(target_os = "windows")]
                 {
-                    if let Err(_) = window_vibrancy::apply_mica(&main_win, Some(true)) {
-                        let _ = window_vibrancy::apply_acrylic(&main_win, Some((20, 20, 20, 10)));
-                    }
+                    crate::commands::apply_vibrancy(&main_win, &config.display.effect_type);
                 }
             }
 
             // Create System Tray Menu
             let toggle_click_through_i = MenuItem::with_id(app, "toggle_click_through", "🔳 开启/关闭穿透", true, None::<&str>)?;
             
-            // Submenu Style
-            let style_minimal_i = MenuItem::with_id(app, "style_minimal", "极简数字", true, None::<&str>)?;
-            let style_glass_i = MenuItem::with_id(app, "style_glass", "暗色玻璃", true, None::<&str>)?;
-            let style_hacker_i = MenuItem::with_id(app, "style_hacker", "终端黑客", true, None::<&str>)?;
-            let style_submenu = SubmenuBuilder::new(app, "🎨 风格")
-                .item(&style_minimal_i)
-                .item(&style_glass_i)
-                .item(&style_hacker_i)
-                .build()?;
-
             // Submenu Layout
             let layout_horizontal_i = MenuItem::with_id(app, "layout_horizontal", "水平", true, None::<&str>)?;
             let layout_vertical_i = MenuItem::with_id(app, "layout_vertical", "垂直", true, None::<&str>)?;
@@ -126,7 +114,6 @@ pub fn run() {
             let tray_menu = MenuBuilder::new(app)
                 .item(&toggle_click_through_i)
                 .separator()
-                .item(&style_submenu)
                 .item(&layout_submenu)
                 .separator()
                 .item(&settings_i)
@@ -181,30 +168,6 @@ pub fn run() {
                         let mut config = state.config.lock().unwrap();
                         config.window.click_through = !config.window.click_through;
                         let _ = window.set_ignore_cursor_events(config.window.click_through);
-                        let _ = crate::config::save_config(&config);
-                        let _ = window.emit("config-changed", &*config);
-                    }
-                }
-                "style_minimal" => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let mut config = state.config.lock().unwrap();
-                        config.display.style = "minimal".to_string();
-                        let _ = crate::config::save_config(&config);
-                        let _ = window.emit("config-changed", &*config);
-                    }
-                }
-                "style_glass" => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let mut config = state.config.lock().unwrap();
-                        config.display.style = "glass".to_string();
-                        let _ = crate::config::save_config(&config);
-                        let _ = window.emit("config-changed", &*config);
-                    }
-                }
-                "style_hacker" => {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let mut config = state.config.lock().unwrap();
-                        config.display.style = "hacker".to_string();
                         let _ = crate::config::save_config(&config);
                         let _ = window.emit("config-changed", &*config);
                     }

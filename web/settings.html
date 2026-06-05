@@ -186,6 +186,15 @@
       border-color: var(--accent-hover);
     }
 
+    /* Range slider */
+    input[type="range"] {
+      width: 140px;
+      accent-color: var(--accent-color);
+      cursor: pointer;
+      height: 6px;
+      border-radius: 3px;
+    }
+
     /* Switch toggle */
     .switch {
       position: relative;
@@ -427,19 +436,42 @@
           <div class="card-title">视觉风格</div>
           <div class="form-group">
             <div class="form-label">
-              主题样式
-              <span>切换悬浮窗的背景与边框效果</span>
+              背景颜色
+              <span>悬浮窗底层背景颜色</span>
             </div>
-            <select v-model="config.display.style">
-              <option value="minimal">极简数字 (透明风格)</option>
-              <option value="glass">暗色玻璃 (Acrylic 磨砂)</option>
-              <option value="hacker">终端黑客 (Neon 绿黑)</option>
+            <div class="color-picker-wrapper" :style="{ backgroundColor: config.display.background_color }">
+              <input type="color" v-model="config.display.background_color">
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="form-label">
+              背景透明度
+              <span>当前: {{ Math.round(config.display.background_opacity * 100) }}%</span>
+            </div>
+            <input type="range" min="0" max="1" step="0.05" v-model.number="config.display.background_opacity">
+          </div>
+          <div class="form-group">
+            <div class="form-label">
+              CSS高斯模糊
+              <span>当前: {{ config.display.blur_radius }}px</span>
+            </div>
+            <input type="range" min="0" max="30" step="1" v-model.number="config.display.blur_radius">
+          </div>
+          <div class="form-group">
+            <div class="form-label">
+              物理模糊特效 (Windows)
+              <span>系统级窗口背景效果（云母/亚克力）</span>
+            </div>
+            <select v-model="config.display.effect_type">
+              <option value="none">无 (None)</option>
+              <option value="mica">云母 (Mica - 推荐 Win11)</option>
+              <option value="acrylic">亚克力 (Acrylic)</option>
             </select>
           </div>
           <div class="form-group">
             <div class="form-label">
               布局方向
-              <span>多指标的排列方向</span>
+              <span>多指标的物理排列方向</span>
             </div>
             <select v-model="config.display.layout">
               <option value="horizontal">横向排列 (Row)</option>
