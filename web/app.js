@@ -11,7 +11,7 @@ const app = createApp({
     const menuX = ref(0);
     const menuY = ref(0);
 
-    // 拖动相关
+    // 拖动相关（纯 Web 兜底用，Tauri 下会使用更顺滑的原生 drag）
     let dragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
@@ -86,18 +86,21 @@ const app = createApp({
       return { horizontal: '横向', vertical: '纵向', grid: '网格' }[l] || l;
     }
 
-    function showMenu(e) {
-      try {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.show_context_menu) {
-          pywebview.api.show_context_menu();
-          return;
+    // 显示右键上下文菜单（如果不是原生托盘）
+    async function showMenu(e) {
+      // 阻止浏览器默认右键菜单
+      e.preventDefault();
+      if (window.__TAURI__) {
+        try {
+          await window.__TAURI__.core.invoke('show_context_menu');
+        } catch (err) {
+          console.warn('打开原生右键菜单失败:', err);
         }
-      } catch (err) {
-        console.warn('调用原生右键菜单失败:', err);
+      } else {
+        menuX.value = e.clientX;
+        menuY.value = e.clientY;
+        menuVisible.value = true;
       }
-      menuX.value = e.clientX;
-      menuY.value = e.clientY;
-      menuVisible.value = true;
     }
 
     async function toggleClickThrough() {
@@ -105,8 +108,12 @@ const app = createApp({
       config.value.window.click_through = newVal;
       menuVisible.value = false;
       try {
-        await pywebview.api.set_config('window.click_through', newVal);
-        await pywebview.api.toggle_click_through(newVal);
+        if (window.__TAURI__) {
+          await window.__TAURI__.core.invoke('set_config', { key: 'window.click_through', value: newVal });
+        } else if (window.pywebview) {
+          await pywebview.api.set_config('window.click_through', newVal);
+          await pywebview.api.toggle_click_through(newVal);
+        }
       } catch (e) { console.warn('Bridge 调用失败:', e); }
     }
 
@@ -115,7 +122,11 @@ const app = createApp({
       menuVisible.value = false;
       loadThemeStyle(style);
       try {
-        await pywebview.api.set_config('display.style', style);
+        if (window.__TAURI__) {
+          await window.__TAURI__.core.invoke('set_config', { key: 'display.style', value: style });
+        } else if (window.pywebview) {
+          await pywebview.api.set_config('display.style', style);
+        }
       } catch (e) { console.warn('Bridge 调用失败:', e); }
     }
 
@@ -123,21 +134,33 @@ const app = createApp({
       config.value.display.layout = layout;
       menuVisible.value = false;
       try {
-        await pywebview.api.set_config('display.layout', layout);
+        if (window.__TAURI__) {
+          await window.__TAURI__.core.invoke('set_config', { key: 'display.layout', value: layout });
+        } else if (window.pywebview) {
+          await pywebview.api.set_config('display.layout', layout);
+        }
       } catch (e) { console.warn('Bridge 调用失败:', e); }
     }
 
     async function openConfig() {
       menuVisible.value = false;
       try {
-        await pywebview.api.open_config_file();
+        if (window.__TAURI__) {
+          await window.__TAURI__.core.invoke('open_config_file');
+        } else if (window.pywebview) {
+          await pywebview.api.open_config_file();
+        }
       } catch (e) { console.warn('Bridge 调用失败:', e); }
     }
 
     async function hideWindow() {
       menuVisible.value = false;
       try {
-        await pywebview.api.toggle_visible();
+        if (window.__TAURI__) {
+          await window.__TAURI__.core.invoke('toggle_visible');
+        } else if (window.pywebview) {
+          await pywebview.api.toggle_visible();
+        }
       } catch (e) { console.warn('Bridge 调用失败:', e); }
     }
 
@@ -145,9 +168,18 @@ const app = createApp({
     function onMouseDown(e) {
       if (!config.value.window.draggable) return;
       if (e.target.closest('.context-menu')) return;
-      dragging = true;
-      dragStartX = e.screenX;
-      dragStartY = e.screenY;
+      
+      if (window.__TAURI__) {
+        try {
+          window.__TAURI__.core.invoke('start_drag');
+        } catch (err) {
+          console.warn('调用 start_drag 失败:', err);
+        }
+      } else {
+        dragging = true;
+        dragStartX = e.screenX;
+        dragStartY = e.screenY;
+      }
     }
 
     function onMouseMove(e) {
@@ -157,77 +189,30 @@ const app = createApp({
       dragStartX = e.screenX;
       dragStartY = e.screenY;
       try {
-        pywebview.api.move_window(dx, dy);
+        if (window.pywebview) {
+          pywebview.api.move_window(dx, dy);
+        }
       } catch (e) { /* ignore */ }
+    }
+
+    // 切换设置面板
+    async function openSettings() {
+      menuVisible.value = false;
+      try {
+        if (window.__TAURI__) {
+          await window.__TAURI__.core.invoke('open_settings_window');
+        } else if (window.pywebview) {
+          await pywebview.api.open_settings_window();
+        }
+      } catch (e) {
+        console.warn('打开设置界面失败:', e);
+      }
     }
 
     function onMouseUp() {
       dragging = false;
     }
-
-    // === 自动调整窗口大小以完全显示所有指标数据 ===
-    async function adjustWindowSize(allowShrink = true) {
-      await Vue.nextTick();
-      const container = document.querySelector('.monitor-container');
-      if (!container) return;
-
-      const cards = container.querySelectorAll('.metric-card');
-      if (cards.length === 0) return;
-
-      const layout = config.value.display.layout;
-      const padding = config.value.display.padding || 8;
-      const gap = config.value.display.gap || 18;
-
-      let reqWidth = 0;
-      let reqHeight = 0;
-
-      if (layout === 'horizontal') {
-        let totalCardsWidth = 0;
-        let maxCardHeight = 0;
-        cards.forEach(card => {
-          const rect = card.getBoundingClientRect();
-          totalCardsWidth += rect.width;
-          if (rect.height > maxCardHeight) maxCardHeight = rect.height;
-        });
-        reqWidth = totalCardsWidth + (cards.length - 1) * gap + 2 * padding;
-        reqHeight = maxCardHeight + 2 * padding;
-      } else if (layout === 'vertical') {
-        let totalCardsHeight = 0;
-        let maxCardWidth = 0;
-        cards.forEach(card => {
-          const rect = card.getBoundingClientRect();
-          totalCardsHeight += rect.height;
-          if (rect.width > maxCardWidth) maxCardWidth = rect.width;
-        });
-        reqWidth = maxCardWidth + 2 * padding;
-        reqHeight = totalCardsHeight + (cards.length - 1) * gap + 2 * padding;
-      } else if (layout === 'grid') {
-        let minX = Infinity, maxX = -Infinity;
-        let minY = Infinity, maxY = -Infinity;
-        cards.forEach(card => {
-          const rect = card.getBoundingClientRect();
-          if (rect.left < minX) minX = rect.left;
-          if (rect.right > maxX) maxX = rect.right;
-          if (rect.top < minY) minY = rect.top;
-          if (rect.bottom > maxY) maxY = rect.bottom;
-        });
-        reqWidth = (maxX - minX) + 2 * padding;
-        reqHeight = (maxY - minY) + 2 * padding;
-      }
-
-      // 加上 8px 缓冲以应对四舍五入或可能出现的边框/滚动条导致被裁剪
-      const finalWidth = Math.ceil(reqWidth) + 8;
-      const finalHeight = Math.ceil(reqHeight) + 8;
-
-      try {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.resize_window_to_fit) {
-          await pywebview.api.resize_window_to_fit(finalWidth, finalHeight, allowShrink);
-        }
-      } catch (e) {
-        console.warn('调整窗口自适应尺寸失败:', e);
-      }
-    }
-
+    // 窗口大小现已完全由内容和全透明窗口容器自适应撑开
     // === 主题加载 ===
     function loadThemeStyle(style) {
       const link = document.getElementById('theme-style');
@@ -236,55 +221,81 @@ const app = createApp({
 
     // === 初始化 ===
     onMounted(async () => {
-      // 等待 pywebview.api 完全就绪（包括方法绑定完成）
-      // pywebview 官方推荐使用 pywebviewready 事件，它会在 API 方法全部注入后才触发
-      await new Promise(resolve => {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_config) {
-          resolve();
-        } else {
-          window.addEventListener('pywebviewready', resolve, { once: true });
-          // 兜底：若事件未触发（极端情况），5秒后超时继续
-          setTimeout(resolve, 5000);
-        }
-      });
+      // 1. 如果是 Tauri 环境
+      if (window.__TAURI__) {
+        const { invoke } = window.__TAURI__.core;
+        const { listen } = window.__TAURI__.event;
 
-      // 加载配置
-      try {
-        const cfg = await pywebview.api.get_config();
-        if (cfg) config.value = cfg;
-      } catch (e) {
-        console.warn('无法从后端加载配置，使用默认值:', e);
+        // 加载配置
+        try {
+          const cfg = await invoke('get_config');
+          if (cfg) config.value = cfg;
+        } catch (e) {
+          console.warn('无法从后端加载配置，使用默认值:', e);
+        }
+
+        // 加载主题
+        loadThemeStyle(config.value.display.style);
+
+        // 监听来自 Rust 的指标高频推送
+        listen('metrics-update', async (event) => {
+          metrics.value = { ...metrics.value, ...event.payload };
+        });
+
+        // 监听来自 Rust 的配置更新（托盘菜单/设置窗口触发的修改）
+        listen('config-changed', async (event) => {
+          config.value = { ...config.value, ...event.payload };
+          loadThemeStyle(config.value.display.style);
+        });
+
+      } else {
+        // 2. 否则，如果是 pywebview 环境（兜底）
+        await new Promise(resolve => {
+          if (window.pywebview && window.pywebview.api && window.pywebview.api.get_config) {
+            resolve();
+          } else {
+            window.addEventListener('pywebviewready', resolve, { once: true });
+            setTimeout(resolve, 5000);
+          }
+        });
+
+        try {
+          const cfg = await pywebview.api.get_config();
+          if (cfg) config.value = cfg;
+        } catch (e) {
+          console.warn('无法从后端加载配置，使用默认值:', e);
+        }
+
+        // 加载主题
+        loadThemeStyle(config.value.display.style);
+
+        // 暴露 updateMetrics 供 Python 调用
+        window.updateMetrics = async (data) => {
+          metrics.value = { ...metrics.value, ...data };
+        };
+
+        // 暴露 updateConfig 供 Python 热加载调用
+        window.updateConfig = async (newConfig) => {
+          config.value = { ...config.value, ...newConfig };
+          loadThemeStyle(config.value.display.style);
+        };
       }
 
-      // 加载主题
-      loadThemeStyle(config.value.display.style);
-
-      // 全局事件
+      // 注册全局鼠标事件用于拖动（仅纯 Web/pywebview 环境有效）
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', onMouseUp);
 
-      // 暴露 updateMetrics 供 Python 调用
-      window.updateMetrics = async (data) => {
-        metrics.value = { ...metrics.value, ...data };
-        await adjustWindowSize(false); // 指标数据更新不缩小窗口，防止数据波动频繁抖动
-      };
-
-      // 暴露 updateConfig 供 Python 热加载调用
-      window.updateConfig = async (newConfig) => {
-        config.value = { ...config.value, ...newConfig };
-        loadThemeStyle(config.value.display.style);
-        await adjustWindowSize(true); // 配置发生变更时允许根据新配置收缩或扩大
-      };
-
-      // 初始化时执行自适应调整
-      await adjustWindowSize(true);
+      // 关闭自定义菜单的全局监听
+      document.addEventListener('click', () => {
+        menuVisible.value = false;
+      });
     });
 
     onUnmounted(() => {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
-      delete window.updateMetrics;
-      delete window.updateConfig;
+      if (window.updateMetrics) delete window.updateMetrics;
+      if (window.updateConfig) delete window.updateConfig;
     });
 
     return {
@@ -292,7 +303,7 @@ const app = createApp({
       enabledMetrics, containerStyle, cardStyle,
       formatValue, styleLabel, layoutLabel,
       showMenu, toggleClickThrough, setStyle, setLayout,
-      openConfig, hideWindow, onMouseDown,
+      openConfig, hideWindow, onMouseDown, openSettings
     };
   },
 });

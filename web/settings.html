@@ -508,14 +508,6 @@
         <div class="card">
           <div class="card-title">窗口属性</div>
           <div class="form-group">
-            <div class="form-label">窗口尺寸</div>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <input type="number" min="100" max="1920" v-model.number="config.window.width" style="width: 70px; text-align: center;" placeholder="宽">
-              <span style="font-size: 12px; color: var(--text-muted);">×</span>
-              <input type="number" min="30" max="1080" v-model.number="config.window.height" style="width: 70px; text-align: center;" placeholder="高">
-            </div>
-          </div>
-          <div class="form-group">
             <div class="form-label">窗口置顶<span>将悬浮窗保持在所有窗口最上层</span></div>
             <label class="switch">
               <input type="checkbox" v-model="config.window.always_on_top">

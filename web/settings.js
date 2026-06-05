@@ -22,74 +22,92 @@ const app = createApp({
     const toastVisible = ref(false);
     let isLoaded = false;
 
-    // === 初始化：从 Python 获取当前配置 ===
+    // === 初始化：从后端获取当前配置 ===
     onMounted(async () => {
-      // 等待 pywebview.api 完全就绪（包括方法绑定完成）
-      // pywebview 官方推荐使用 pywebviewready 事件，它会在 API 方法全部注入后才触发
-      await new Promise(resolve => {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_config) {
-          resolve();
-        } else {
-          window.addEventListener('pywebviewready', resolve, { once: true });
-          // 兜底：若事件未触发（极端情况），5秒后超时继续
-          setTimeout(resolve, 5000);
+      if (window.__TAURI__) {
+        // Tauri 环境
+        const { invoke } = window.__TAURI__.core;
+        try {
+          const loadedConfig = await invoke('get_config');
+          if (loadedConfig) {
+            config.value = JSON.parse(JSON.stringify(loadedConfig));
+          }
+        } catch (err) {
+          console.warn('Tauri 获取配置失败:', err);
+        } finally {
+          isLoaded = true;
         }
-      });
+      } else {
+        // pywebview 兜底环境
+        await new Promise(resolve => {
+          if (window.pywebview && window.pywebview.api && window.pywebview.api.get_config) {
+            resolve();
+          } else {
+            window.addEventListener('pywebviewready', resolve, { once: true });
+            setTimeout(resolve, 5000);
+          }
+        });
 
-      try {
-        const loadedConfig = await pywebview.api.get_config();
-        if (loadedConfig) {
-          // 深拷贝，防止修改未保存就污染全局
-          config.value = JSON.parse(JSON.stringify(loadedConfig));
+        try {
+          const loadedConfig = await pywebview.api.get_config();
+          if (loadedConfig) {
+            config.value = JSON.parse(JSON.stringify(loadedConfig));
+          }
+        } catch (err) {
+          console.warn('pywebview 获取配置失败:', err);
+        } finally {
+          isLoaded = true;
         }
-      } catch (err) {
-        console.warn('获取配置失败:', err);
-      } finally {
-        isLoaded = true;
       }
     });
 
     // 深度监听配置变化并实时临时应用预览，但不写入磁盘
     watch(config, (newVal) => {
       if (!isLoaded) return;
-      if (window.pywebview && window.pywebview.api && window.pywebview.api.apply_config_temp) {
-        const rawConfig = JSON.parse(JSON.stringify(newVal));
+      const rawConfig = JSON.parse(JSON.stringify(newVal));
+      if (window.__TAURI__) {
+        window.__TAURI__.core.invoke('apply_config_temp', { patch: rawConfig }).catch(err => {
+          console.warn('Tauri 实时预览配置失败:', err);
+        });
+      } else if (window.pywebview && window.pywebview.api && window.pywebview.api.apply_config_temp) {
         pywebview.api.apply_config_temp(rawConfig).catch(err => {
-          console.warn('实时预览配置失败:', err);
+          console.warn('pywebview 实时预览配置失败:', err);
         });
       }
     }, { deep: true });
 
     // === 指标排序：向上移动 ===
-    function moveMetricUp(index) {
+    fn_moveUp = (index) => {
       if (index === 0) return;
       const list = config.value.metrics;
       const temp = list[index];
       list[index] = list[index - 1];
       list[index - 1] = temp;
-    }
+    };
 
     // === 指标排序：向下移动 ===
-    function moveMetricDown(index) {
+    fn_moveDown = (index) => {
       const list = config.value.metrics;
       if (index === list.length - 1) return;
       const temp = list[index];
       list[index] = list[index + 1];
       list[index + 1] = temp;
-    }
+    };
 
     // === 保存并应用配置 ===
     async function saveSettings() {
       try {
-        // 调用 python 的批量保存接口
-        // 因为是双向绑定，config.value 包含用户修改的最新完整数据
-        // 直接传递给 set_config_bulk
-        await pywebview.api.set_config_bulk(config.value);
+        const rawConfig = JSON.parse(JSON.stringify(config.value));
+        if (window.__TAURI__) {
+          await window.__TAURI__.core.invoke('set_config_bulk', { patch: rawConfig });
+        } else {
+          await pywebview.api.set_config_bulk(rawConfig);
+        }
 
         // 弹出保存成功提示
         toastVisible.value = true;
         
-        // 1秒后关闭窗口
+        // 1.2秒后关闭窗口
         setTimeout(() => {
           toastVisible.value = false;
           closeSettings();
@@ -103,7 +121,9 @@ const app = createApp({
     // === 关闭设置窗口 ===
     function closeSettings() {
       try {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.close_settings_window) {
+        if (window.__TAURI__) {
+          window.__TAURI__.core.invoke('close_settings_window');
+        } else if (window.pywebview && window.pywebview.api && window.pywebview.api.close_settings_window) {
           pywebview.api.close_settings_window();
         } else {
           window.close();
@@ -118,8 +138,8 @@ const app = createApp({
       currentTab,
       config,
       toastVisible,
-      moveMetricUp,
-      moveMetricDown,
+      moveMetricUp: fn_moveUp,
+      moveMetricDown: fn_moveDown,
       saveSettings,
       closeSettings,
     };

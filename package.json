@@ -1,0 +1,11 @@
+{
+  "name": "gyy-monitor",
+  "version": "1.0.0",
+  "description": "System Monitor Widget with Rust + Tauri",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.2"
+  }
+}

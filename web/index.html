@@ -15,15 +15,17 @@
       :style="containerStyle"
       @contextmenu.prevent="showMenu"
       @mousedown="onMouseDown"
+      data-tauri-drag-region
     >
       <div
         v-for="item in enabledMetrics"
         :key="item.id"
         class="metric-card"
         :style="cardStyle"
+        data-tauri-drag-region
       >
-        <span class="metric-label">{{ item.label }}</span>
-        <span class="metric-value" :style="{ color: item.color }">{{ formatValue(metrics[item.id], item) }}<span class="metric-unit" v-if="item.unit">{{ item.unit }}</span></span>
+        <span class="metric-label" data-tauri-drag-region>{{ item.label }}</span>
+        <span class="metric-value" :style="{ color: item.color }" data-tauri-drag-region>{{ formatValue(metrics[item.id], item) }}<span class="metric-unit" v-if="item.unit" data-tauri-drag-region>{{ item.unit }}</span></span>
       </div>
     </div>
 
