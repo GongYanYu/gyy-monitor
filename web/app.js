@@ -236,13 +236,17 @@ const app = createApp({
 
     // === 初始化 ===
     onMounted(async () => {
-      // 循环等待 pywebview.api 初始化完毕，以确保能正确读取到后端保存的配置
-      let retries = 0;
-      while (!window.pywebview || !window.pywebview.api) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-        retries++;
-        if (retries > 60) break; // 最多等3秒
-      }
+      // 等待 pywebview.api 完全就绪（包括方法绑定完成）
+      // pywebview 官方推荐使用 pywebviewready 事件，它会在 API 方法全部注入后才触发
+      await new Promise(resolve => {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_config) {
+          resolve();
+        } else {
+          window.addEventListener('pywebviewready', resolve, { once: true });
+          // 兜底：若事件未触发（极端情况），5秒后超时继续
+          setTimeout(resolve, 5000);
+        }
+      });
 
       // 加载配置
       try {
