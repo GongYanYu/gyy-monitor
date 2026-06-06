@@ -10,21 +10,27 @@
   <div id="app">
     <div
       class="monitor-container"
-      :class="['layout-' + config.display.layout]"
       :style="containerStyle"
       @contextmenu.prevent="showMenu"
       @mousedown="onMouseDown"
       data-tauri-drag-region
     >
       <div
-        v-for="item in enabledMetrics"
-        :key="item.id"
-        class="metric-card"
-        :style="cardStyle"
+        class="monitor-content"
+        :class="['layout-' + config.display.layout]"
+        :style="contentStyle"
         data-tauri-drag-region
       >
-        <span class="metric-label" data-tauri-drag-region>{{ item.label }}</span>
-        <span class="metric-value" :style="{ color: item.color }" data-tauri-drag-region>{{ formatValue(metrics[item.id], item) }}<span class="metric-unit" v-if="item.unit" data-tauri-drag-region>{{ item.unit }}</span></span>
+        <div
+          v-for="item in enabledMetrics"
+          :key="item.id"
+          class="metric-card"
+          :style="cardStyle"
+          data-tauri-drag-region
+        >
+          <span class="metric-label" data-tauri-drag-region>{{ item.label }}</span>
+          <span class="metric-value" :style="{ color: item.color }" data-tauri-drag-region>{{ formatValue(metrics[item.id], item) }}<span class="metric-unit" v-if="item.unit" data-tauri-drag-region>{{ item.unit }}</span></span>
+        </div>
       </div>
     </div>
   </div>

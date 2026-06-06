@@ -91,6 +91,25 @@ pub fn run() {
                 #[cfg(target_os = "windows")]
                 {
                     crate::commands::apply_vibrancy(&main_win, &config.display.effect_type);
+
+                    // 监听窗口焦点变化，动态应用/清除原生组合效果以防止失焦时产生黑块
+                    let win_clone = main_win.clone();
+                    main_win.on_window_event(move |event| {
+                        if let tauri::WindowEvent::Focused(focused) = event {
+                            let app_handle = win_clone.app_handle();
+                            let state = app_handle.state::<AppState>();
+                            let effect = {
+                                let config = state.config.lock().unwrap();
+                                config.display.effect_type.clone()
+                            };
+                            if *focused {
+                                crate::commands::apply_vibrancy(&win_clone, &effect);
+                            } else {
+                                let _ = window_vibrancy::clear_mica(&win_clone);
+                                let _ = window_vibrancy::clear_acrylic(&win_clone);
+                            }
+                        }
+                    });
                 }
             }
 

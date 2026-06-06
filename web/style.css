@@ -17,17 +17,28 @@ html, body {
 
 /* === 布局容器 === */
 .monitor-container {
-  display: inline-flex;
+  display: flex;
   position: absolute;
   left: 0;
   top: 0;
-  width: max-content;
-  height: fit-content;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
   align-items: center;
   border: 1px solid transparent;
   border-radius: 8px;
   box-shadow: none;
   transition: background-color 0.15s, backdrop-filter 0.15s, border-color 0.15s, box-shadow 0.15s;
+  overflow: hidden;
+}
+
+.monitor-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  height: fit-content;
+  transition: gap 0.15s;
 }
 
 .layout-horizontal {
@@ -42,7 +53,7 @@ html, body {
 }
 
 .layout-grid {
-  display: grid;
+  display: grid !important;
   grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   align-content: center;
 }

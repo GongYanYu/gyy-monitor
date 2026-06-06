@@ -26,14 +26,16 @@ pub fn apply_vibrancy(window: &tauri::WebviewWindow, effect_type: &str) {
     {
         let _ = window_vibrancy::clear_mica(window);
         let _ = window_vibrancy::clear_acrylic(window);
-        match effect_type {
-            "mica" => {
-                let _ = window_vibrancy::apply_mica(window, Some(true));
+        if window.is_focused().unwrap_or(true) {
+            match effect_type {
+                "mica" => {
+                    let _ = window_vibrancy::apply_mica(window, Some(true));
+                }
+                "acrylic" => {
+                    let _ = window_vibrancy::apply_acrylic(window, Some((20, 20, 20, 10)));
+                }
+                _ => {}
             }
-            "acrylic" => {
-                let _ = window_vibrancy::apply_acrylic(window, Some((20, 20, 20, 10)));
-            }
-            _ => {}
         }
     }
 }

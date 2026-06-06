@@ -10,6 +10,7 @@ const app = createApp({
     const menuVisible = ref(false);
     const menuX = ref(0);
     const menuY = ref(0);
+    const isFocused = ref(true);
 
     // 拖动相关（纯 Web 兜底用，Tauri 下会使用更顺滑的原生 drag）
     let dragging = false;
@@ -73,22 +74,50 @@ const app = createApp({
 
     const containerStyle = computed(() => {
       const d = config.value.display;
-      const bgOpacity = d.background_opacity ?? 0.85;
+      const effect = d.effect_type || 'none';
+      
+      // 1. 动态确定背景不透明度与是否应用 CSS 模糊
+      let bgOpacity = d.background_opacity ?? 0.85;
+      let applyCssBlur = false;
+
+      if (effect === 'acrylic' || effect === 'mica') {
+        if (isFocused.value) {
+          // 获得焦点且有原生特效：极高透明度，由系统渲染毛玻璃，禁用 CSS 模糊以防冲突和卡顿
+          bgOpacity = Math.min(bgOpacity, 0.1);
+          applyCssBlur = false;
+        } else {
+          // 失去焦点：Rust 端会清除原生特效以防黑屏，此时降级为纯 CSS 模糊和透明度，完全遵循用户设置
+          applyCssBlur = true;
+        }
+      } else {
+        // 无原生特效：始终使用 CSS 模糊
+        applyCssBlur = true;
+      }
+
       const bgColor = d.background_color ?? '#1e1e2e';
       const blur = d.blur_radius ?? 10.0;
       
       const rgbaBg = hexToRgba(bgColor, bgOpacity);
       const hasBgOrBlur = bgOpacity > 0 || blur > 0;
+      
+      // 决定最终的 blur 滤镜字符串
+      const blurStr = (applyCssBlur && blur > 0) ? `blur(${blur}px)` : 'none';
 
       return {
-        gap: (d.gap || 18) + 'px',
         padding: (d.padding || 8) + 'px',
         fontSize: (d.font_size || 14) + 'px',
         background: rgbaBg,
-        backdropFilter: blur > 0 ? `blur(${blur}px)` : 'none',
-        webkitBackdropFilter: blur > 0 ? `blur(${blur}px)` : 'none',
+        backdropFilter: blurStr,
+        webkitBackdropFilter: blurStr,
         borderColor: hasBgOrBlur ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
         boxShadow: hasBgOrBlur ? '0 8px 32px rgba(0, 0, 0, 0.3)' : 'none',
+      };
+    });
+
+    const contentStyle = computed(() => {
+      const d = config.value.display;
+      return {
+        gap: (d.gap || 18) + 'px',
       };
     });
 
@@ -227,6 +256,14 @@ const app = createApp({
 
     // === 初始化 ===
     onMounted(async () => {
+      // 监听窗口焦点状态
+      window.addEventListener('focus', () => {
+        isFocused.value = true;
+      });
+      window.addEventListener('blur', () => {
+        isFocused.value = false;
+      });
+
       // 1. 如果是 Tauri 环境
       if (window.__TAURI__) {
         const { invoke } = window.__TAURI__.core;
@@ -250,22 +287,23 @@ const app = createApp({
           config.value = { ...config.value, ...event.payload };
         });
 
-        // 监听容器大小并自适应窗口物理尺寸
-        const container = document.querySelector('.monitor-container');
-        if (container) {
+        // 监听内容组件大小并自适应窗口物理尺寸
+        const content = document.querySelector('.monitor-content');
+        if (content) {
           const resizeObserver = new ResizeObserver((entries) => {
             for (let entry of entries) {
               const rect = entry.target.getBoundingClientRect();
-              // 设定最小值以确保稳定性
-              const width = Math.max(100, Math.ceil(rect.width));
-              const height = Math.max(30, Math.ceil(rect.height));
+              // 加上内外边距和边框边距
+              const padding = (config.value.display.padding || 8) * 2;
+              const width = Math.max(100, Math.ceil(rect.width) + padding + 2);
+              const height = Math.max(30, Math.ceil(rect.height) + padding + 2);
               
               invoke('resize_window_to_fit', { width, height }).catch((err) => {
                 console.warn('调整窗口大小失败:', err);
               });
             }
           });
-          resizeObserver.observe(container);
+          resizeObserver.observe(content);
         }
 
       } else {
@@ -317,7 +355,7 @@ const app = createApp({
 
     return {
       config, metrics, menuVisible, menuX, menuY,
-      enabledMetrics, containerStyle, cardStyle,
+      enabledMetrics, containerStyle, contentStyle, cardStyle,
       formatValue, layoutLabel,
       showMenu, toggleClickThrough, setLayout,
       openConfig, hideWindow, onMouseDown, openSettings
