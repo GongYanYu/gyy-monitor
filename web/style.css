@@ -142,6 +142,22 @@ html, body {
 .taskbar-unit {
   color: #000000 !important;
   text-shadow: none !important;
+  transition: color 0.3s ease;
+}
+
+/* 当从系统注册表检测到暗色主题，或者 webview 检测到 prefers-color-scheme 为 dark 时 */
+.taskbar-container.windows-dark .taskbar-label,
+.taskbar-container.windows-dark .taskbar-value,
+.taskbar-container.windows-dark .taskbar-unit {
+  color: #ffffff !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .taskbar-label,
+  .taskbar-value,
+  .taskbar-unit {
+    color: #ffffff !important;
+  }
 }
 
 .taskbar-label {

@@ -7,6 +7,11 @@ use sysinfo::System;
 use nvml_wrapper::Nvml;
 use wmi::{COMLibrary, WMIConnection};
 
+#[cfg(target_os = "windows")]
+use winreg::enums::*;
+#[cfg(target_os = "windows")]
+use winreg::RegKey;
+
 // Windows FFI imports
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::System::Diagnostics::Etw::*;
@@ -64,6 +69,7 @@ pub struct MetricsSnapshot {
     pub ram_total: Option<f64>,
     pub fps: Option<f64>,
     pub fps_1pct_low: Option<f64>,
+    pub is_system_dark: Option<bool>,
 }
 
 pub struct SystemCollector {
@@ -155,6 +161,17 @@ impl SystemCollector {
             let (fps, fps_low) = self.collect_fps();
             snapshot.fps = Some(fps);
             snapshot.fps_1pct_low = Some(fps_low);
+        }
+
+        // 5. Collect Windows System Theme (Dark/Light)
+        #[cfg(target_os = "windows")]
+        {
+            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+            if let Ok(theme_key) = hkcu.open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") {
+                if let Ok(val) = theme_key.get_value::<u32, _>("SystemUsesLightTheme") {
+                    snapshot.is_system_dark = Some(val == 0);
+                }
+            }
         }
 
         snapshot

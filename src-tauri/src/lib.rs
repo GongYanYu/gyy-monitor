@@ -15,16 +15,28 @@ use crate::app_state::AppState;
 use crate::config::{load_config, update_autostart_registry};
 
 #[cfg(target_os = "windows")]
+use winreg::enums::*;
+#[cfg(target_os = "windows")]
+use winreg::RegKey;
+
+#[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     FindWindowW, FindWindowExW, SetParent, SetWindowLongW, GetWindowLongW,
     SetWindowPos, GWL_STYLE, WS_CHILD, WS_POPUP, SWP_NOZORDER, SWP_SHOWWINDOW,
     GetForegroundWindow, GetWindowRect, GetSystemMetrics, GetClassNameW,
-    SM_CXSCREEN, SM_CYSCREEN
+    SM_CXSCREEN, SM_CYSCREEN, GetAncestor, IsWindowVisible, IsWindow
 };
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Graphics::Gdi::ScreenToClient;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::HWND;
+
+pub fn get_taskbar_window<R: tauri::Runtime, M: tauri::Manager<R>>(manager: &M) -> Option<tauri::WebviewWindow<R>> {
+    manager.webview_windows()
+        .values()
+        .find(|w| w.label().starts_with("taskbar"))
+        .cloned()
+}
 
 pub fn get_hwnd_from_window<W: raw_window_handle::HasWindowHandle>(window: &W) -> Option<isize> {
     use raw_window_handle::RawWindowHandle;
@@ -50,9 +62,16 @@ pub unsafe fn embed_in_taskbar(window_hwnd: HWND, width: i32, height: i32, align
 
     // 修改窗口样式为子窗口且无弹出属性
     let style = GetWindowLongW(window_hwnd, GWL_STYLE);
-    SetWindowLongW(window_hwnd, GWL_STYLE, (style & !(WS_POPUP as i32)) | WS_CHILD as i32);
+    let set_style_res = SetWindowLongW(window_hwnd, GWL_STYLE, (style & !(WS_POPUP as i32)) | WS_CHILD as i32);
+    println!("[Taskbar] SetWindowLongW style modified. Old style: {}, New style set. Result: {}", style, set_style_res);
     
-    SetParent(window_hwnd, shell_tray);
+    let res = SetParent(window_hwnd, shell_tray);
+    if res == 0 {
+        let err = std::io::Error::last_os_error();
+        println!("[Taskbar] SetParent failed! error: {}", err);
+    } else {
+        println!("[Taskbar] SetParent succeeded! Old parent was: {}", res);
+    }
 
     reposition_taskbar_window_hwnd(window_hwnd, width, height, align, offset_x, offset_y);
     
@@ -91,6 +110,47 @@ pub unsafe fn reposition_taskbar_window_hwnd(window_hwnd: HWND, width: i32, heig
     let y = y + offset_y; // 加上垂直微调
     
     SetWindowPos(window_hwnd, 0, x, y, width, height, SWP_NOZORDER | SWP_SHOWWINDOW);
+}
+
+#[cfg(target_os = "windows")]
+fn recreate_and_embed_taskbar(app_handle: &tauri::AppHandle, config: &crate::config::Config) {
+    let label = format!("taskbar_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+    println!("[Taskbar] Recreating taskbar webview window with label: {}...", label);
+    match tauri::WebviewWindowBuilder::new(
+        app_handle,
+        &label,
+        tauri::WebviewUrl::App("index.html?mode=taskbar".into())
+    )
+    .title("gyy-monitor-taskbar")
+    .inner_size(300.0, 40.0)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(false)
+    .visible(false)
+    .skip_taskbar(true)
+    .build() {
+        Ok(new_win) => {
+            println!("[Taskbar] Recreated taskbar window successfully.");
+            if let Some(hwnd) = get_hwnd_from_window(&new_win) {
+                let scale = new_win.scale_factor().unwrap_or(1.0);
+                let p_width = (300.0 * scale).round() as i32;
+                let p_height = (36.0 * scale).round() as i32;
+                let p_offset_x = (config.taskbar.offset_x as f64 * scale).round() as i32;
+                let p_offset_y = (config.taskbar.offset_y as f64 * scale).round() as i32;
+                unsafe {
+                    if let Err(e) = embed_in_taskbar(hwnd as _, p_width, p_height, &config.taskbar.align, p_offset_x, p_offset_y) {
+                        println!("[Taskbar] embed_in_taskbar failed on recreated window: {}", e);
+                    } else {
+                        let _ = new_win.show();
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            println!("[Taskbar] Failed to recreate taskbar window: {}", e);
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -199,7 +259,7 @@ pub fn run() {
                     if let Some(main_win) = thread_app.get_webview_window("main") {
                         let _ = main_win.emit("metrics-update", &snapshot);
                     }
-                    if let Some(taskbar_win) = thread_app.get_webview_window("taskbar") {
+                    if let Some(taskbar_win) = get_taskbar_window(&thread_app) {
                         let _ = taskbar_win.emit("metrics-update", &snapshot);
                     }
                     if let Some(settings_win) = thread_app.get_webview_window("settings") {
@@ -214,6 +274,16 @@ pub fn run() {
             let thread_app_game = app_handle.clone();
             thread::spawn(move || {
                 let mut last_state = is_game;
+                #[cfg(target_os = "windows")]
+                let mut last_theme_dark = {
+                    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+                    if let Ok(theme_key) = hkcu.open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") {
+                        theme_key.get_value::<u32, _>("SystemUsesLightTheme").map(|val| val == 0).unwrap_or(false)
+                    } else {
+                        false
+                    }
+                };
+
                 loop {
                     #[cfg(target_os = "windows")]
                     {
@@ -221,12 +291,37 @@ pub fn run() {
                         let state = thread_app_game.state::<AppState>();
                         state.is_game_active.store(is_game_active, Ordering::Relaxed);
                         
+                        let config = state.config.lock().unwrap().clone();
+                        
+                        // 获取当前系统的深色主题状态
+                        let is_dark = {
+                            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+                            if let Ok(theme_key) = hkcu.open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") {
+                                theme_key.get_value::<u32, _>("SystemUsesLightTheme").map(|val| val == 0).unwrap_or(false)
+                            } else {
+                                false
+                            }
+                        };
+                        let theme_changed = is_dark != last_theme_dark;
+                        if theme_changed {
+                            last_theme_dark = is_dark;
+                            println!("[Taskbar] Theme change detected (is_dark: {}). Detaching window to protect it.", is_dark);
+                            if let Some(taskbar_win) = get_taskbar_window(&thread_app_game) {
+                                if let Some(hwnd) = get_hwnd_from_window(&taskbar_win) {
+                                    unsafe {
+                                        let style = GetWindowLongW(hwnd as _, GWL_STYLE);
+                                        SetWindowLongW(hwnd as _, GWL_STYLE, (style & !(WS_CHILD as i32)) | WS_POPUP as i32);
+                                        SetParent(hwnd as _, 0);
+                                        let _ = taskbar_win.hide();
+                                    }
+                                }
+                            }
+                        }
+
                         if is_game_active != last_state {
                             last_state = is_game_active;
                             
                             // 切换窗口可见性
-                            let config = state.config.lock().unwrap().clone();
-                            
                             if let Some(main_win) = thread_app_game.get_webview_window("main") {
                                 if is_game_active || !config.taskbar.enabled {
                                     let _ = main_win.show();
@@ -236,12 +331,77 @@ pub fn run() {
                                 }
                             }
                             
-                            if let Some(taskbar_win) = thread_app_game.get_webview_window("taskbar") {
+                            if let Some(taskbar_win) = get_taskbar_window(&thread_app_game) {
                                 if config.taskbar.enabled && !is_game_active {
                                     let _ = taskbar_win.show();
                                 } else {
                                     let _ = taskbar_win.hide();
                                 }
+                            }
+                        }
+
+                        // 自愈机制：如果开启了任务栏模式且未在游戏中，确保窗口正确嵌入并显示
+                        if config.taskbar.enabled && !is_game_active {
+                            if let Some(taskbar_win) = get_taskbar_window(&thread_app_game) {
+                                if let Some(hwnd) = get_hwnd_from_window(&taskbar_win) {
+                                    unsafe {
+                                        let is_hwnd_valid = IsWindow(hwnd as _) != 0;
+                                        if !is_hwnd_valid {
+                                            println!("[Taskbar] Taskbar window handle is invalid. Re-creating taskbar webview window.");
+                                            let _ = taskbar_win.close();
+                                            let mut retries = 0;
+                                            while get_taskbar_window(&thread_app_game).is_some() && retries < 20 {
+                                                thread::sleep(Duration::from_millis(50));
+                                                retries += 1;
+                                            }
+                                            recreate_and_embed_taskbar(&thread_app_game, &config);
+                                        } else {
+                                            let shell_tray = FindWindowW(to_wstring("Shell_TrayWnd").as_ptr(), std::ptr::null());
+                                            let parent = GetAncestor(hwnd as _, 1); // GA_PARENT = 1
+                                            let is_visible = IsWindowVisible(hwnd as _) != 0;
+                                            let style = GetWindowLongW(hwnd as _, GWL_STYLE);
+                                            let is_child = (style & WS_CHILD as i32) != 0;
+                                            let mut rect = std::mem::zeroed();
+                                            GetWindowRect(hwnd as _, &mut rect);
+                                            
+                                            // 检查是否丢失了父窗口，或者父窗口不是 Shell_TrayWnd，或者系统主题发生改变
+                                            let need_reembed = parent == 0 || parent != shell_tray || theme_changed;
+                                            
+                                            if need_reembed || !is_visible {
+                                                println!("[Taskbar] Re-embedding taskbar window. reason (reembed: {}, visible: {})", need_reembed, is_visible);
+                                                // 隐藏窗口 50ms 以重置底层 composition
+                                                let _ = taskbar_win.hide();
+                                                thread::sleep(Duration::from_millis(50));
+
+                                                let scale = taskbar_win.scale_factor().unwrap_or(1.0);
+                                                let p_width = (300.0 * scale).round() as i32;
+                                                let p_height = (36.0 * scale).round() as i32;
+                                                let p_offset_x = (config.taskbar.offset_x as f64 * scale).round() as i32;
+                                                let p_offset_y = (config.taskbar.offset_y as f64 * scale).round() as i32;
+                                                
+                                                if let Err(e) = embed_in_taskbar(hwnd as _, p_width, p_height, &config.taskbar.align, p_offset_x, p_offset_y) {
+                                                    println!("[Taskbar] embed_in_taskbar failed: {}.", e);
+                                                    let is_hwnd_still_valid = IsWindow(hwnd as _) != 0;
+                                                    if !is_hwnd_still_valid {
+                                                        println!("[Taskbar] HWND is invalid. Re-creating taskbar window.");
+                                                        let _ = taskbar_win.close();
+                                                        let mut retries = 0;
+                                                        while get_taskbar_window(&thread_app_game).is_some() && retries < 20 {
+                                                            thread::sleep(Duration::from_millis(50));
+                                                            retries += 1;
+                                                        }
+                                                        recreate_and_embed_taskbar(&thread_app_game, &config);
+                                                    }
+                                                } else {
+                                                    let _ = taskbar_win.show();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                println!("[Taskbar] Taskbar window not found but enabled. Re-creating taskbar webview window.");
+                                recreate_and_embed_taskbar(&thread_app_game, &config);
                             }
                         }
                     }
@@ -295,7 +455,7 @@ pub fn run() {
             }
 
             // Initialize taskbar window
-            if let Some(taskbar_win) = app.get_webview_window("taskbar") {
+            if let Some(taskbar_win) = get_taskbar_window(app) {
                 if config.taskbar.enabled && !is_game {
                     #[cfg(target_os = "windows")]
                     {

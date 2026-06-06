@@ -146,6 +146,13 @@ const app = createApp({
       return { fontSize: (d.font_size || 14) + 'px' };
     });
 
+    const isSystemDark = computed(() => {
+      if (metrics.value.is_system_dark !== undefined && metrics.value.is_system_dark !== null) {
+        return metrics.value.is_system_dark;
+      }
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
+
     const taskbarContainerStyle = computed(() => {
       const t = config.value.taskbar || {};
       return {
@@ -464,7 +471,7 @@ const app = createApp({
     return {
       config, metrics, menuVisible, menuX, menuY,
       enabledMetrics, containerStyle, contentStyle, cardStyle,
-      isTaskbar, taskbarColumns,
+      isTaskbar, taskbarColumns, isSystemDark,
       taskbarContainerStyle, taskbarContentStyle, taskbarColumnStyle,
       taskbarLabelStyle, taskbarValueStyle, taskbarUnitStyle,
       formatValue, layoutLabel,

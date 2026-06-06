@@ -98,7 +98,7 @@ pub fn set_config(
             }
 
             // Toggle taskbar window visibility
-            if let Some(taskbar_win) = window.get_webview_window("taskbar") {
+            if let Some(taskbar_win) = crate::get_taskbar_window(&window) {
                 if enabled {
                     if !is_game {
                         #[cfg(target_os = "windows")]
@@ -123,7 +123,7 @@ pub fn set_config(
         }
     } else if key == "taskbar.align" {
         if let Some(align_str) = value.as_str() {
-            if let Some(taskbar_win) = window.get_webview_window("taskbar") {
+            if let Some(taskbar_win) = crate::get_taskbar_window(&window) {
                 #[cfg(target_os = "windows")]
                 {
                     if let Some(hwnd) = crate::get_hwnd_from_window(&taskbar_win) {
@@ -140,7 +140,7 @@ pub fn set_config(
             }
         }
     } else if key == "taskbar.offset_x" || key == "taskbar.offset_y" {
-        if let Some(taskbar_win) = window.get_webview_window("taskbar") {
+        if let Some(taskbar_win) = crate::get_taskbar_window(&window) {
             #[cfg(target_os = "windows")]
             {
                 if let Some(hwnd) = crate::get_hwnd_from_window(&taskbar_win) {
@@ -218,7 +218,7 @@ pub fn set_config_bulk(
     }
 
     // Apply taskbar window visibility
-    if let Some(taskbar_win) = window.get_webview_window("taskbar") {
+    if let Some(taskbar_win) = crate::get_taskbar_window(&window) {
         if current_config.taskbar.enabled {
             let is_game = {
                 let state = window.state::<AppState>();
@@ -301,7 +301,7 @@ pub fn apply_config_temp(
 
 #[tauri::command]
 pub fn resize_window_to_fit(window: tauri::Window, width: f64, height: f64) -> Result<bool, String> {
-    if window.label() == "taskbar" {
+    if window.label().starts_with("taskbar") {
         #[cfg(target_os = "windows")]
         {
             if let Some(hwnd) = crate::get_hwnd_from_window(&window) {
