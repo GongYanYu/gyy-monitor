@@ -11,6 +11,7 @@ const app = createApp({
     const menuX = ref(0);
     const menuY = ref(0);
     const isFocused = ref(true);
+    const isTaskbar = ref(new URLSearchParams(window.location.search).get('mode') === 'taskbar');
 
     // 拖动相关（纯 Web 兜底用，Tauri 下会使用更顺滑的原生 drag）
     let dragging = false;
@@ -33,6 +34,15 @@ const app = createApp({
           layout: 'horizontal',
           custom_css: null, font_size: 14, gap: 18, padding: 8,
         },
+        taskbar: {
+          enabled: true,
+          align: 'right',
+          offset_x: 0,
+          offset_y: 0,
+          font_size: 14,
+          gap: 12,
+          padding: 4,
+        },
         metrics: [
           {"id": "cpu_usage", "enabled": true, "label": "CPU", "unit": "%", "color": "#4fc3f7", "decimals": 0},
           {"id": "cpu_temp", "enabled": true, "label": "CPUT", "unit": "°C", "color": "#4fc3f7", "decimals": 0},
@@ -43,6 +53,7 @@ const app = createApp({
         update_interval_ms: 1000,
         autostart: false,
         fps_only_in_game: true,
+        stop_monitoring_non_game: false,
       };
     }
 
@@ -58,6 +69,15 @@ const app = createApp({
         }
         return true;
       });
+    });
+
+    const taskbarColumns = computed(() => {
+      const list = enabledMetrics.value;
+      const cols = [];
+      for (let i = 0; i < list.length; i += 2) {
+        cols.push(list.slice(i, i + 2));
+      }
+      return cols;
     });
 
     function hexToRgba(hex, opacity) {
@@ -124,6 +144,58 @@ const app = createApp({
     const cardStyle = computed(() => {
       const d = config.value.display;
       return { fontSize: (d.font_size || 14) + 'px' };
+    });
+
+    const taskbarContainerStyle = computed(() => {
+      const t = config.value.taskbar || {};
+      return {
+        paddingLeft: (t.padding ?? 4) + 'px',
+        paddingRight: (t.padding ?? 4) + 'px',
+      };
+    });
+
+    const taskbarContentStyle = computed(() => {
+      const t = config.value.taskbar || {};
+      return {
+        gap: (t.gap ?? 12) + 'px',
+      };
+    });
+
+    const taskbarLabelStyle = computed(() => {
+      const t = config.value.taskbar || {};
+      const base = 10;
+      const ratio = (t.font_size || 14) / 14;
+      return {
+        fontSize: Math.max(7, Math.round(base * ratio)) + 'px',
+      };
+    });
+
+    const taskbarValueStyle = computed(() => {
+      const t = config.value.taskbar || {};
+      const base = 11;
+      const ratio = (t.font_size || 14) / 14;
+      return {
+        fontSize: Math.max(7, Math.round(base * ratio)) + 'px',
+      };
+    });
+
+    const taskbarUnitStyle = computed(() => {
+      const t = config.value.taskbar || {};
+      const base = 9;
+      const ratio = (t.font_size || 14) / 14;
+      return {
+        fontSize: Math.max(6, Math.round(base * ratio)) + 'px',
+      };
+    });
+
+    const taskbarColumnStyle = computed(() => {
+      const t = config.value.taskbar || {};
+      const ratio = (t.font_size || 14) / 14;
+      const baseMinWidth = 68;
+      return {
+        minWidth: Math.round(baseMinWidth * ratio) + 'px',
+        gap: Math.max(1, Math.round(2 * ratio)) + 'px',
+      };
     });
 
     // === 方法 ===
@@ -282,28 +354,64 @@ const app = createApp({
           metrics.value = { ...metrics.value, ...event.payload };
         });
 
+        // 定期主动拉取数据作为兜底，确保数据一定能显示
+        let pullIntervalId = null;
+        const pullMetrics = async () => {
+          try {
+            const data = await invoke('get_metrics');
+            if (data) {
+              metrics.value = { ...metrics.value, ...data };
+            }
+          } catch (e) {
+            console.warn('拉取数据失败:', e);
+          }
+        };
+        pullMetrics();
+        pullIntervalId = setInterval(pullMetrics, config.value.update_interval_ms || 1000);
+
         // 监听来自 Rust 的配置更新（托盘菜单/设置窗口触发的修改）
         listen('config-changed', async (event) => {
           config.value = { ...config.value, ...event.payload };
+          if (pullIntervalId) {
+            clearInterval(pullIntervalId);
+          }
+          pullIntervalId = setInterval(pullMetrics, config.value.update_interval_ms || 1000);
         });
 
-        // 监听内容组件大小并自适应窗口物理尺寸
-        const content = document.querySelector('.monitor-content');
-        if (content) {
+        // 监听游戏状态切换
+        listen('game-mode-changed', (event) => {
+          console.log('游戏状态改变:', event.payload);
+        });
+
+        // 监听组件大小并自适应窗口物理尺寸
+        const observerTarget = isTaskbar.value 
+          ? document.querySelector('.taskbar-content')
+          : document.querySelector('.monitor-content');
+          
+        if (observerTarget) {
           const resizeObserver = new ResizeObserver((entries) => {
             for (let entry of entries) {
               const rect = entry.target.getBoundingClientRect();
-              // 加上内外边距和边框边距
-              const padding = (config.value.display.padding || 8) * 2;
-              const width = Math.max(100, Math.ceil(rect.width) + padding + 2);
-              const height = Math.max(30, Math.ceil(rect.height) + padding + 2);
+              
+              let width, height;
+              if (isTaskbar.value) {
+                // 任务栏嵌入模式下：高度固定为 40px，宽度根据内容自适应 + 左右 padding + 安全余量
+                const t = config.value.taskbar || {};
+                const taskbarPadding = (t.padding ?? 4) * 2;
+                width = Math.ceil(rect.width) + taskbarPadding + 16;
+                height = 40;
+              } else {
+                const padding = (config.value.display.padding || 8) * 2;
+                width = Math.max(100, Math.ceil(rect.width) + padding + 2);
+                height = Math.max(30, Math.ceil(rect.height) + padding + 2);
+              }
               
               invoke('resize_window_to_fit', { width, height }).catch((err) => {
                 console.warn('调整窗口大小失败:', err);
               });
             }
           });
-          resizeObserver.observe(content);
+          resizeObserver.observe(observerTarget);
         }
 
       } else {
@@ -356,6 +464,9 @@ const app = createApp({
     return {
       config, metrics, menuVisible, menuX, menuY,
       enabledMetrics, containerStyle, contentStyle, cardStyle,
+      isTaskbar, taskbarColumns,
+      taskbarContainerStyle, taskbarContentStyle, taskbarColumnStyle,
+      taskbarLabelStyle, taskbarValueStyle, taskbarUnitStyle,
       formatValue, layoutLabel,
       showMenu, toggleClickThrough, setLayout,
       openConfig, hideWindow, onMouseDown, openSettings

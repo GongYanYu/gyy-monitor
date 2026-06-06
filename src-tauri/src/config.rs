@@ -50,10 +50,38 @@ pub struct MetricItem {
 pub struct Config {
     pub window: WindowConfig,
     pub display: DisplayConfig,
+    pub taskbar: TaskbarConfig,
     pub metrics: Vec<MetricItem>,
     pub update_interval_ms: u64,
     pub autostart: bool,
     pub fps_only_in_game: bool,
+    pub stop_monitoring_non_game: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TaskbarConfig {
+    pub enabled: bool,
+    pub align: String,
+    pub offset_x: i32,
+    pub offset_y: i32,
+    pub font_size: f64,
+    pub gap: f64,
+    pub padding: f64,
+}
+
+impl Default for TaskbarConfig {
+    fn default() -> Self {
+        TaskbarConfig {
+            enabled: true,
+            align: "right".to_string(),
+            offset_x: 0,
+            offset_y: 0,
+            font_size: 14.0,
+            gap: 12.0,
+            padding: 4.0,
+        }
+    }
 }
 
 impl Default for Config {
@@ -81,6 +109,7 @@ impl Default for Config {
                 gap: 18.0,
                 padding: 8.0,
             },
+            taskbar: TaskbarConfig::default(),
             metrics: vec![
                 MetricItem { id: "cpu_usage".to_string(), enabled: true, label: "CPU".to_string(), unit: "%".to_string(), color: "#4fc3f7".to_string(), decimals: 0 },
                 MetricItem { id: "cpu_power".to_string(), enabled: true, label: "CPUP".to_string(), unit: "W".to_string(), color: "#4fc3f7".to_string(), decimals: 1 },
@@ -99,6 +128,7 @@ impl Default for Config {
             update_interval_ms: 1000,
             autostart: false,
             fps_only_in_game: true,
+            stop_monitoring_non_game: false,
         }
     }
 }
@@ -130,8 +160,30 @@ pub fn load_config() -> Config {
         if let Ok(mut file) = File::open(&path) {
             let mut contents = String::new();
             if file.read_to_string(&mut contents).is_ok() {
-                if let Ok(config) = serde_json::from_str(&contents) {
-                    return config;
+                if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&contents) {
+                    // 平滑过渡：如果旧版 config.json 没有 "taskbar" 字段，自动从旧的顶层字段迁移数据
+                    if value.get("taskbar").is_none() {
+                        let enabled = value.get("taskbar_mode").and_then(|v| v.as_bool()).unwrap_or(true);
+                        let align = value.get("taskbar_align").and_then(|v| v.as_str()).unwrap_or("right").to_string();
+                        let offset_x = value.get("taskbar_offset_x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        let offset_y = value.get("taskbar_offset_y").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+
+                        let taskbar_obj = serde_json::json!({
+                            "enabled": enabled,
+                            "align": align,
+                            "offset_x": offset_x,
+                            "offset_y": offset_y,
+                            "font_size": 14.0,
+                            "gap": 12.0,
+                            "padding": 4.0
+                        });
+                        if let Some(obj) = value.as_object_mut() {
+                            obj.insert("taskbar".to_string(), taskbar_obj);
+                        }
+                    }
+                    if let Ok(config) = serde_json::from_value::<Config>(value) {
+                        return config;
+                    }
                 }
             }
         }

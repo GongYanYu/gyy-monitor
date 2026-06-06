@@ -482,7 +482,7 @@
         </div>
 
         <div class="card">
-          <div class="card-title">排版细节</div>
+          <div class="card-title">桌面浮窗模式排版</div>
           <div class="form-group">
             <div class="form-label">字体大小 (px)</div>
             <input type="number" min="8" max="32" v-model.number="config.display.font_size">
@@ -494,6 +494,22 @@
           <div class="form-group">
             <div class="form-label">内边距 (px)</div>
             <input type="number" min="0" max="40" v-model.number="config.display.padding">
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">任务栏嵌入模式排版</div>
+          <div class="form-group">
+            <div class="form-label">字体大小 (px)</div>
+            <input type="number" min="8" max="32" v-model.number="config.taskbar.font_size">
+          </div>
+          <div class="form-group">
+            <div class="form-label">指标间距 (px)</div>
+            <input type="number" min="0" max="60" v-model.number="config.taskbar.gap">
+          </div>
+          <div class="form-group">
+            <div class="form-label">内边距 (px)</div>
+            <input type="number" min="0" max="40" v-model.number="config.taskbar.padding">
           </div>
         </div>
       </div>
@@ -579,6 +595,35 @@
             <div class="form-label">FPS 仅游戏时显示<span>非游戏状态下自动隐藏 FPS 与 1%L 指标</span></div>
             <label class="switch">
               <input type="checkbox" v-model="config.fps_only_in_game">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-group">
+            <div class="form-label">显示模式选择<span>设置非全屏游戏状态下监控界面的呈现形式</span></div>
+            <select v-model="config.taskbar.enabled">
+              <option :value="false">桌面浮窗模式</option>
+              <option :value="true">任务栏嵌入模式</option>
+            </select>
+          </div>
+          <div class="form-group" v-if="config.taskbar.enabled">
+            <div class="form-label">任务栏对齐位置<span>设置监控嵌入窗口在任务栏的对齐位置</span></div>
+            <select v-model="config.taskbar.align">
+              <option value="right">右侧 (系统托盘区旁)</option>
+              <option value="left">左侧 (徽标/小组件旁)</option>
+            </select>
+          </div>
+          <div class="form-group" v-if="config.taskbar.enabled">
+            <div class="form-label">任务栏水平偏移 (px)<span>微调监控条在任务栏的水平坐标，正数向右，负数向左</span></div>
+            <input type="number" step="1" v-model.number="config.taskbar.offset_x">
+          </div>
+          <div class="form-group" v-if="config.taskbar.enabled">
+            <div class="form-label">任务栏垂直偏移 (px)<span>微调监控条在任务栏的垂直坐标，正数向下，负数向上</span></div>
+            <input type="number" step="1" v-model.number="config.taskbar.offset_y">
+          </div>
+          <div class="form-group">
+            <div class="form-label">非游戏模式下停止监控<span>未处于全屏游戏时自动隐藏悬浮窗并暂停硬件监控以省电</span></div>
+            <label class="switch">
+              <input type="checkbox" v-model="config.stop_monitoring_non_game">
               <span class="slider"></span>
             </label>
           </div>

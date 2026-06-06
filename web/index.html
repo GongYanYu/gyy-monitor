@@ -8,7 +8,9 @@
 </head>
 <body>
   <div id="app">
+    <!-- 桌面悬浮窗模式 -->
     <div
+      v-if="!isTaskbar"
       class="monitor-container"
       :style="containerStyle"
       @contextmenu.prevent="showMenu"
@@ -30,6 +32,38 @@
         >
           <span class="metric-label" data-tauri-drag-region>{{ item.label }}</span>
           <span class="metric-value" :style="{ color: item.color }" data-tauri-drag-region>{{ formatValue(metrics[item.id], item) }}<span class="metric-unit" v-if="item.unit" data-tauri-drag-region>{{ item.unit }}</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 任务栏嵌入监控条模式 -->
+    <div
+      v-else
+      class="taskbar-container"
+      :style="taskbarContainerStyle"
+      @contextmenu.prevent="showMenu"
+      @mousedown="onMouseDown"
+      data-tauri-drag-region
+    >
+      <div class="taskbar-content" :style="taskbarContentStyle" data-tauri-drag-region>
+        <div
+          v-for="(col, colIndex) in taskbarColumns"
+          :key="colIndex"
+          class="taskbar-column"
+          :style="taskbarColumnStyle"
+          data-tauri-drag-region
+        >
+          <div
+            v-for="item in col"
+            :key="item.id"
+            class="taskbar-row"
+            data-tauri-drag-region
+          >
+            <span class="taskbar-label" :style="taskbarLabelStyle" data-tauri-drag-region>{{ item.label }}</span>
+            <span class="taskbar-value" :style="taskbarValueStyle" data-tauri-drag-region>
+              {{ formatValue(metrics[item.id], item) }}<span class="taskbar-unit" v-if="item.unit" :style="taskbarUnitStyle" data-tauri-drag-region>{{ item.unit }}</span>
+            </span>
+          </div>
         </div>
       </div>
     </div>

@@ -19,9 +19,20 @@ const app = createApp({
         layout: 'horizontal',
         custom_css: null, font_size: 14, gap: 18, padding: 8,
       },
+      taskbar: {
+        enabled: true,
+        align: 'right',
+        offset_x: 0,
+        offset_y: 0,
+        font_size: 14,
+        gap: 12,
+        padding: 4,
+      },
       metrics: [],
       update_interval_ms: 1000,
       autostart: false,
+      fps_only_in_game: true,
+      stop_monitoring_non_game: false,
     });
     const toastVisible = ref(false);
     let isLoaded = false;
@@ -111,10 +122,9 @@ const app = createApp({
         // 弹出保存成功提示
         toastVisible.value = true;
         
-        // 1.2秒后关闭窗口
+        // 1.2秒后仅隐藏保存提示，不关闭窗口
         setTimeout(() => {
           toastVisible.value = false;
-          closeSettings();
         }, 1200);
       } catch (err) {
         console.warn('保存配置失败:', err);

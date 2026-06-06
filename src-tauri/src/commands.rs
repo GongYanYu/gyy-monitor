@@ -81,16 +81,87 @@ pub fn set_config(
                 apply_vibrancy(&main_win, eff);
             }
         }
+    } else if key == "taskbar.enabled" {
+        if let Some(enabled) = value.as_bool() {
+            let is_game = {
+                let state = window.state::<AppState>();
+                state.is_game_active.load(std::sync::atomic::Ordering::Relaxed)
+            };
+
+            // Toggle main window visibility
+            if let Some(main_win) = window.get_webview_window("main") {
+                if is_game || !enabled {
+                    let _ = main_win.show();
+                } else {
+                    let _ = main_win.hide();
+                }
+            }
+
+            // Toggle taskbar window visibility
+            if let Some(taskbar_win) = window.get_webview_window("taskbar") {
+                if enabled {
+                    if !is_game {
+                        #[cfg(target_os = "windows")]
+                        {
+                            if let Some(hwnd) = crate::get_hwnd_from_window(&taskbar_win) {
+                                let scale = taskbar_win.scale_factor().unwrap_or(1.0);
+                                let p_width = (300.0 * scale).round() as i32;
+                                let p_height = (36.0 * scale).round() as i32;
+                                let p_offset_x = (new_config.taskbar.offset_x as f64 * scale).round() as i32;
+                                let p_offset_y = (new_config.taskbar.offset_y as f64 * scale).round() as i32;
+                                unsafe {
+                                    let _ = crate::embed_in_taskbar(hwnd as _, p_width, p_height, &new_config.taskbar.align, p_offset_x, p_offset_y);
+                                }
+                            }
+                        }
+                        let _ = taskbar_win.show();
+                    }
+                } else {
+                    let _ = taskbar_win.hide();
+                }
+            }
+        }
+    } else if key == "taskbar.align" {
+        if let Some(align_str) = value.as_str() {
+            if let Some(taskbar_win) = window.get_webview_window("taskbar") {
+                #[cfg(target_os = "windows")]
+                {
+                    if let Some(hwnd) = crate::get_hwnd_from_window(&taskbar_win) {
+                        if let Ok(size) = taskbar_win.outer_size() {
+                            unsafe {
+                                let scale = taskbar_win.scale_factor().unwrap_or(1.0);
+                                let p_offset_x = (new_config.taskbar.offset_x as f64 * scale).round() as i32;
+                                let p_offset_y = (new_config.taskbar.offset_y as f64 * scale).round() as i32;
+                                crate::reposition_taskbar_window_hwnd(hwnd as _, size.width as i32, size.height as i32, align_str, p_offset_x, p_offset_y);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else if key == "taskbar.offset_x" || key == "taskbar.offset_y" {
+        if let Some(taskbar_win) = window.get_webview_window("taskbar") {
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(hwnd) = crate::get_hwnd_from_window(&taskbar_win) {
+                    if let Ok(size) = taskbar_win.outer_size() {
+                        let scale = taskbar_win.scale_factor().unwrap_or(1.0);
+                        let p_offset_x = (new_config.taskbar.offset_x as f64 * scale).round() as i32;
+                        let p_offset_y = (new_config.taskbar.offset_y as f64 * scale).round() as i32;
+                        unsafe {
+                            crate::reposition_taskbar_window_hwnd(hwnd as _, size.width as i32, size.height as i32, &new_config.taskbar.align, p_offset_x, p_offset_y);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Save to file
     save_config(&current_config).map_err(|e| e.to_string())?;
 
-    // Broadcast config update to windows
-    let _ = window.emit("config-changed", &*current_config);
-    if let Some(settings_win) = window.get_webview_window("settings") {
-        let _ = settings_win.emit("config-changed", &*current_config);
-    }
+    // Broadcast config update to all windows globally
+    let _ = window.app_handle().emit("config-changed", &*current_config);
 
     Ok(true)
 }
@@ -132,19 +203,55 @@ pub fn set_config_bulk(
     let _ = window.set_always_on_top(current_config.window.always_on_top);
     let _ = window.set_ignore_cursor_events(current_config.window.click_through);
 
-    // Apply vibrancy to main window
+    // Apply vibrancy and visibility to main window
+    let is_game = {
+        let state = window.state::<AppState>();
+        state.is_game_active.load(std::sync::atomic::Ordering::Relaxed)
+    };
     if let Some(main_win) = window.get_webview_window("main") {
         apply_vibrancy(&main_win, &current_config.display.effect_type);
+        if is_game || !current_config.taskbar.enabled {
+            let _ = main_win.show();
+        } else {
+            let _ = main_win.hide();
+        }
+    }
+
+    // Apply taskbar window visibility
+    if let Some(taskbar_win) = window.get_webview_window("taskbar") {
+        if current_config.taskbar.enabled {
+            let is_game = {
+                let state = window.state::<AppState>();
+                state.is_game_active.load(std::sync::atomic::Ordering::Relaxed)
+            };
+            if !is_game {
+                #[cfg(target_os = "windows")]
+                {
+                    if let Some(hwnd) = crate::get_hwnd_from_window(&taskbar_win) {
+                        let scale = taskbar_win.scale_factor().unwrap_or(1.0);
+                        let p_width = (300.0 * scale).round() as i32;
+                        let p_height = (36.0 * scale).round() as i32;
+                        let p_offset_x = (current_config.taskbar.offset_x as f64 * scale).round() as i32;
+                        let p_offset_y = (current_config.taskbar.offset_y as f64 * scale).round() as i32;
+                        unsafe {
+                            let _ = crate::embed_in_taskbar(hwnd as _, p_width, p_height, &current_config.taskbar.align, p_offset_x, p_offset_y);
+                        }
+                    }
+                }
+                let _ = taskbar_win.show();
+            } else {
+                let _ = taskbar_win.hide();
+            }
+        } else {
+            let _ = taskbar_win.hide();
+        }
     }
 
     // Save to file
     save_config(&current_config).map_err(|e| e.to_string())?;
 
-    // Broadcast config update
-    let _ = window.emit("config-changed", &*current_config);
-    if let Some(settings_win) = window.get_webview_window("settings") {
-        let _ = settings_win.emit("config-changed", &*current_config);
-    }
+    // Broadcast config update to all windows globally
+    let _ = window.app_handle().emit("config-changed", &*current_config);
 
     Ok(true)
 }
@@ -186,15 +293,37 @@ pub fn apply_config_temp(
         apply_vibrancy(&main_win, &current_config.display.effect_type);
     }
 
-    // Notify frontend to preview styles
-    let _ = window.emit("config-changed", &*current_config);
+    // Notify all windows to preview styles globally
+    let _ = window.app_handle().emit("config-changed", &*current_config);
 
     Ok(true)
 }
 
 #[tauri::command]
 pub fn resize_window_to_fit(window: tauri::Window, width: f64, height: f64) -> Result<bool, String> {
-    window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height })).map_err(|e| e.to_string())?;
+    if window.label() == "taskbar" {
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(hwnd) = crate::get_hwnd_from_window(&window) {
+                let scale_factor = window.scale_factor().unwrap_or(1.0);
+                let physical_width = (width * scale_factor).round() as i32;
+                let physical_height = (height * scale_factor).round() as i32;
+                
+                let state = window.state::<AppState>();
+                let (align, offset_x, offset_y) = {
+                    let config = state.config.lock().unwrap();
+                    (config.taskbar.align.clone(), config.taskbar.offset_x, config.taskbar.offset_y)
+                };
+                let p_offset_x = (offset_x as f64 * scale_factor).round() as i32;
+                let p_offset_y = (offset_y as f64 * scale_factor).round() as i32;
+                unsafe {
+                    crate::reposition_taskbar_window_hwnd(hwnd as _, physical_width, physical_height, &align, p_offset_x, p_offset_y);
+                }
+            }
+        }
+    } else {
+        window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height })).map_err(|e| e.to_string())?;
+    }
     Ok(true)
 }
 
@@ -260,6 +389,7 @@ pub fn open_settings_window(app_handle: tauri::AppHandle, state: tauri::State<'_
         .inner_size(550.0, 650.0)
         .resizable(true)
         .always_on_top(always_on_top)
+        .center()
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -271,9 +401,9 @@ pub fn open_settings_window(app_handle: tauri::AppHandle, state: tauri::State<'_
                 let mut current_config = state.config.lock().unwrap();
                 let saved_config = crate::config::load_config();
                 *current_config = saved_config.clone();
-                // Notify main window to revert styles
+                // Notify all windows to revert styles globally
+                let _ = app_clone.emit("config-changed", &saved_config);
                 if let Some(main_win) = app_clone.get_webview_window("main") {
-                    let _ = main_win.emit("config-changed", &saved_config);
                     apply_vibrancy(&main_win, &saved_config.display.effect_type);
                 }
             }
@@ -343,4 +473,10 @@ pub fn show_context_menu(window: tauri::Window) -> Result<(), String> {
 pub fn start_drag(window: tauri::Window) -> Result<(), String> {
     window.start_dragging().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_metrics(state: tauri::State<'_, AppState>) -> serde_json::Value {
+    let metrics = state.metrics.lock().unwrap();
+    metrics.clone()
 }

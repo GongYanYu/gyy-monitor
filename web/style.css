@@ -93,3 +93,74 @@ html, body {
   color: #cbd5e1;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
 }
+
+/* === 任务栏嵌入监控条模式 === */
+.taskbar-container {
+  display: flex;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  background: transparent !important;
+  padding: 0px 4px;
+  overflow: hidden;
+  box-shadow: none;
+  border: none;
+}
+
+.taskbar-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  width: max-content;
+}
+
+.taskbar-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 68px;
+  height: 100%;
+}
+
+.taskbar-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.taskbar-label,
+.taskbar-value,
+.taskbar-unit {
+  color: #000000 !important;
+  text-shadow: none !important;
+}
+
+.taskbar-label {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.8;
+  margin-right: 4px;
+}
+
+.taskbar-value {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-family: 'Consolas', 'Cascadia Code', monospace;
+}
+
+.taskbar-unit {
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.75;
+  margin-left: 1px;
+}

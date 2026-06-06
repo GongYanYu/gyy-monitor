@@ -12,6 +12,7 @@
       {
         "label": "main",
         "title": "gyy-monitor",
+        "url": "index.html?mode=floating",
         "width": 800,
         "height": 60,
         "resizable": true,
@@ -19,6 +20,19 @@
         "transparent": true,
         "alwaysOnTop": true,
         "visible": true
+      },
+      {
+        "label": "taskbar",
+        "title": "gyy-monitor-taskbar",
+        "url": "index.html?mode=taskbar",
+        "width": 300,
+        "height": 40,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": false,
+        "visible": false,
+        "skipTaskbar": true
       }
     ],
     "security": {
