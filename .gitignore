@@ -6,3 +6,4 @@ build/
 *.spec
 .superpowers/
 .venv/
+node_modules/
