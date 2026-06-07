@@ -450,7 +450,7 @@ pub fn show_context_menu(window: tauri::Window) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     let toggle_visible_i = MenuItem::with_id(app_handle, "toggle_visible", "👁 显示/隐藏窗口", true, None::<&str>)
         .map_err(|e| e.to_string())?;
-    let quit_i = MenuItem::with_id(app_handle, "quit", "❌ 退出", true, None::<&str>)
+    let quit_i = MenuItem::with_id(app_handle, "quit", "❌ 退出应用", true, None::<&str>)
         .map_err(|e| e.to_string())?;
 
     let menu = MenuBuilder::new(app_handle)

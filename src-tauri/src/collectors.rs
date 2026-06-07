@@ -21,7 +21,7 @@ use windows_sys::Win32::UI::Shell::IsUserAnAdmin;
 const WNODE_FLAG_TRACING_SHARE_SESSION: u32 = 0x00010000;
 
 // Global structures for ETW DXGI event tracking
-static FRAME_TIMESTAMPS: LazyLock<Mutex<HashMap<(u32, u64), Vec<Instant>>>> =
+static FRAME_TIMESTAMPS: LazyLock<Mutex<HashMap<(u32, u64), Vec<f64>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static EVENT_TIMESTAMPS: LazyLock<Mutex<HashMap<u32, Instant>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -291,8 +291,13 @@ impl SystemCollector {
             let mut swapchain_results = Vec::new();
             for key in active_keys {
                 if let Some(timestamps) = timestamps_map.get_mut(&key) {
-                    // Filter timestamps within last 1.5 seconds
-                    let cutoff = now - Duration::from_millis(1500);
+                    if timestamps.is_empty() {
+                        continue;
+                    }
+
+                    // Filter timestamps within last 1.5 seconds relative to the latest timestamp
+                    let latest_ts = *timestamps.last().unwrap();
+                    let cutoff = latest_ts - 1.5;
                     timestamps.retain(|&t| t >= cutoff);
 
                     if timestamps.len() < 2 {
@@ -300,7 +305,7 @@ impl SystemCollector {
                     }
 
                     let total_frames = timestamps.len();
-                    let time_span = timestamps.last().unwrap().duration_since(timestamps[0]).as_secs_f64();
+                    let time_span = timestamps.last().unwrap() - timestamps[0];
                     
                     let fps = if time_span > 0.0 {
                         (total_frames - 1) as f64 / time_span
@@ -311,7 +316,7 @@ impl SystemCollector {
                     // Compute 1% Low FPS
                     let mut frame_times = Vec::new();
                     for i in 1..timestamps.len() {
-                        frame_times.push(timestamps[i].duration_since(timestamps[i - 1]).as_secs_f64());
+                        frame_times.push(timestamps[i] - timestamps[i - 1]);
                     }
 
                     let fps_1pct_low = if frame_times.len() >= 10 {
@@ -383,11 +388,13 @@ unsafe extern "system" fn event_record_callback(record: *mut EVENT_RECORD) {
     let now = Instant::now();
     let key = (pid, swap_chain);
 
+    let etw_time_sec = rec.EventHeader.TimeStamp as f64 / 10_000_000.0;
+
     if let Ok(mut timestamps) = FRAME_TIMESTAMPS.lock() {
         let list = timestamps.entry(key).or_insert_with(Vec::new);
-        list.push(now);
+        list.push(etw_time_sec);
 
-        let cutoff = now - Duration::from_secs(3);
+        let cutoff = etw_time_sec - 3.0;
         list.retain(|&t| t >= cutoff);
     }
 
@@ -407,6 +414,7 @@ unsafe fn start_etw_session() {
     let props = buffer.as_mut_ptr() as *mut EVENT_TRACE_PROPERTIES;
     (*props).Wnode.BufferSize = size as u32;
     (*props).Wnode.Flags = WNODE_FLAG_TRACING_SHARE_SESSION;
+    (*props).Wnode.ClientContext = 1; // Use QPC as clock resolution for timestamps
     (*props).Wnode.Guid = windows_sys::core::GUID {
         data1: 0,
         data2: 0,

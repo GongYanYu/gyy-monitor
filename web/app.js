@@ -32,7 +32,7 @@ const app = createApp({
           blur_radius: 10.0,
           effect_type: 'acrylic',
           layout: 'horizontal',
-          custom_css: null, font_size: 14, gap: 18, padding: 8,
+          custom_css: null, font_size: 14, gap: 1, padding: 8,
         },
         taskbar: {
           enabled: true,

@@ -106,7 +106,7 @@ impl Default for Config {
                 layout: "horizontal".to_string(),
                 custom_css: None,
                 font_size: 14.0,
-                gap: 18.0,
+                gap: 1.0,
                 padding: 8.0,
             },
             taskbar: TaskbarConfig::default(),

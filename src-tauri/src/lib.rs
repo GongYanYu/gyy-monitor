@@ -24,8 +24,11 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     FindWindowW, FindWindowExW, SetParent, SetWindowLongW, GetWindowLongW,
     SetWindowPos, GWL_STYLE, WS_CHILD, WS_POPUP, SWP_NOZORDER, SWP_SHOWWINDOW,
     GetForegroundWindow, GetWindowRect, GetSystemMetrics, GetClassNameW,
-    SM_CXSCREEN, SM_CYSCREEN, GetAncestor, IsWindowVisible, IsWindow
+    SM_CXSCREEN, SM_CYSCREEN, GetAncestor, IsWindowVisible, IsWindow,
+    GetWindowThreadProcessId
 };
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Graphics::Gdi::ScreenToClient;
 #[cfg(target_os = "windows")]
@@ -154,11 +157,18 @@ fn recreate_and_embed_taskbar(app_handle: &tauri::AppHandle, config: &crate::con
 }
 
 #[cfg(target_os = "windows")]
-fn is_foreground_window_fullscreen() -> bool {
+fn is_foreground_window_fullscreen(last_state: bool) -> bool {
     unsafe {
         let hwnd = GetForegroundWindow();
         if hwnd == 0 {
-            return false;
+            return last_state;
+        }
+
+        // Check if the foreground window belongs to our own process
+        let mut process_id = 0u32;
+        GetWindowThreadProcessId(hwnd as _, &mut process_id);
+        if process_id == GetCurrentProcessId() {
+            return last_state;
         }
 
         let mut rect = std::mem::zeroed();
@@ -216,7 +226,7 @@ pub fn run() {
             let is_game = {
                 #[cfg(target_os = "windows")]
                 {
-                    is_foreground_window_fullscreen()
+                    is_foreground_window_fullscreen(false)
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
@@ -287,7 +297,7 @@ pub fn run() {
                 loop {
                     #[cfg(target_os = "windows")]
                     {
-                        let is_game_active = is_foreground_window_fullscreen();
+                        let is_game_active = is_foreground_window_fullscreen(last_state);
                         let state = thread_app_game.state::<AppState>();
                         state.is_game_active.store(is_game_active, Ordering::Relaxed);
                         
@@ -491,7 +501,7 @@ pub fn run() {
 
             let settings_i = MenuItem::with_id(app, "settings", "⚙️ 设置...", true, None::<&str>)?;
             let toggle_visible_i = MenuItem::with_id(app, "toggle_visible", "👁 显示/隐藏窗口", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "❌ 退出", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "❌ 退出应用", true, None::<&str>)?;
 
             let tray_menu = MenuBuilder::new(app)
                 .item(&toggle_click_through_i)
